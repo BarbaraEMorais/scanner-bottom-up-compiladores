@@ -67,3 +67,5 @@ Scheme → Scanner → Tokens → Parser → AST → Semântica → Python
 
 ## ✅ Resumo
 Compilador que lê Scheme, analisa com Flex+Bison, valida e gera Python.
+
+---
