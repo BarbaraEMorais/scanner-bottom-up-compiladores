@@ -3,4 +3,4 @@ compile: flex.yy.c
 flex.yy.c:
 	flex *.l 
 clean:
-	rm -f lex.yy.c main
+	rm -f lex.yy.c main *.o
