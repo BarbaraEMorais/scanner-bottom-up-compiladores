@@ -2,6 +2,10 @@
     //Variáveis e outras definições vem aqui dentro
 #include "token.h"
 #include <stdlib.h>
+
+// Lista de tokens
+
+
 %}
 
 %option noyywrap
