@@ -1,10 +1,6 @@
 // Define os tokens básicos da linguagem scheme
 // string, identificadores e números podem em teoria ser definidos aqui
 // Ou podemos usar a recursão da linguagem no bison.
-
-#include <stdlib.h>
-#include "errors.h"
-
 typedef struct token Token;
 
 typedef enum token_type{ 
@@ -101,47 +97,9 @@ struct token
     Token* next;
 };
 
-Token* create_token(TokenType type, char* content){
-    Token* base = (Token*) malloc(sizeof(Token));
-    if (base == NULL){
-        print_error(MALLOC_ERROR, content);
-        return NULL;
-    }
-    base->type = type;
-    base->value = content;
-    base->previous = NULL;
-}
+Token* create_token(TokenType type, char* content);
+Token* move_to_end(Token* base);
+Token append_new_token(Token* base, TokenType new_token_type, char* new_token_content);
+Token append_token(Token* base, Token* to_append);
+void free_tokens(Token* base);
 
-Token* move_to_end(Token* base){
-    Token* curr=base;
-    while (curr->next != NULL)
-    {
-        curr = curr->next;
-    }
-    
-    return curr;
-}
-
-Token append_new_token(Token* base, TokenType new_token_type, char* new_token_content){
-    Token* last = move_to_end(base);
-    
-    last->next = create_token(new_token_type, new_token_content);
-    last->next->previous = base;
-}
-
-Token append_token(Token* base, Token* to_append){
-    base->next = to_append;
-    to_append->previous = base;
-}
-
-void free_tokens(Token* base){
-    Token* curr = base;
-
-    while (curr != NULL)
-    {
-        Token* to_delete = base;
-        curr = base->next;
-        free(to_delete);
-    }
-    
-}
