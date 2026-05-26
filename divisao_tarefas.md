@@ -1,25 +1,26 @@
 ## 👥 Divisão de Tarefas (Grupo)
 
-### 👤 Pessoa 1 — Scanner (Flex)
-- [ ] Definir tokens da linguagem (números, identificadores, operadores, parênteses)
-- [ ] Implementar regras no arquivo `.l`
-- [ ] Testar reconhecimento de tokens
-- [ ] Tratar erros léxicos
-- [ ] Integrar saída de tokens com o parser
+### 👤 Cael — Scanner (Flex)
+- [x] Definir tokens da linguagem (números, identificadores, operadores, parênteses)
+- [ ] Passar regras para `definitions.l`  
+- [ ] Ver se reconhecimento de tokens está funcionando
+- [ ] Tratar erros léxicos 
+- [ ] Integrar saída de tokens com o parser**
 
 ---
 
-### 👤 Pessoa 2 — Parser (Bison)
-- [ ] Definir gramática da linguagem
-- [ ] Implementar regras no arquivo `.y`
-- [ ] Construir AST (Árvore Sintática)
-- [ ] Resolver conflitos (shift/reduce, reduce/reduce)
-- [ ] Integrar com o scanner
+### 👤 João + Bárbara — Parser (Bison)
+- [ ] Definir gramática da linguagem [J]
+- [ ] Implementar regras no arquivo `.y` [J]
+- [ ] Construir AST (Árvore Sintática) [B]
+- [ ] Resolver conflitos (shift/reduce, reduce/reduce) 
+- [ ] Integrar com o scanner [J]
 
 ---
 
-### 👤 Pessoa 3 — Semântica + Geração de Código
-- [ ] Implementar tabela de símbolos
+### 👤 Geral — Semântica + Geração de Código
+- [ ] Fazer tratativa de erros final
+- [ ] Implementar tabela de símbolos 
 - [ ] Verificar declaração e uso de variáveis
 - [ ] Validar tipos (ex: número vs string)
 - [ ] Implementar controle de escopo
@@ -34,7 +35,6 @@
 - [ ] Integrar todas as etapas (scanner → parser → semântica → código)
 - [ ] Criar Makefile
 - [ ] Testar execução completa
-- [ ] Escrever relatório final
 
 ---
 
