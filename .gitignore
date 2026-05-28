@@ -3,3 +3,4 @@
 src/main
 src/*.o
 src/lex.yy.c
+src/grammar.tab.*
