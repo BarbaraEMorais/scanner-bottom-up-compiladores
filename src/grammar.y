@@ -94,5 +94,5 @@ integer: {printf("%d", yylval);}
 %%
 
 void yyerror(struct YYLTYPE* loc, char* s){
- fprintf(stderr, "Error at %d: %s", loc, s);
+ fprintf(stderr, "Error at line %d, column %d: %s \n", loc->first_line, loc->first_column, s);
 }
