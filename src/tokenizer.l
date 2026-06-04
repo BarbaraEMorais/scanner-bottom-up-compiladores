@@ -12,6 +12,21 @@
 "\\"      {printf("Flex: \\ found!\n"); return TOK_BACKSLASH;}
 "\""      {printf("Flex: \" found!\n"); return TOK_STRING_DELIM;}
 "'"      {printf("Flex: ' found!\n"); return TOK_LITERAL_DELIM;}
+"#|"      {printf("Flex: %s found!\n", yytext); return TOK_MULTILINE_COMMENT_START;}
+"|#"      {printf("Flex: %s found!\n", yytext); return TOK_MULTILINE_COMMENT_END;}
+
+"*"      {printf("Flex: %s found!\n", yytext); return TOK_MULT;}
+"-"      {printf("Flex: %s found!\n", yytext); return TOK_MINUS;}
+"+"      {printf("Flex: %s found!\n", yytext); return TOK_PLUS;}
+"="      {printf("Flex: %s found!\n", yytext); return TOK_EQUAL;}
+"|"      {printf("Flex: %s found!\n", yytext); return TOK_VERTICAL_LINE;}
+"<"      {printf("Flex: %s found!\n", yytext); return TOK_LEFT_ARROW;}
+">"      {printf("Flex: %s found!\n", yytext); return TOK_RIGHT_ARROW;}
+
+#t      {printf("Flex: %s found!\n", yytext); return TOK_TRUE;}
+#true   {printf("Flex: %s found!\n", yytext); return TOK_TRUE;}
+#f      {printf("Flex: %s found!\n", yytext); return TOK_FALSE;}
+#false   {printf("Flex: %s found!\n", yytext); return TOK_FALSE;}
 
 
 if      {printf("Flex: found  %s", yytext); return TOK_IF;}
@@ -37,10 +52,10 @@ loop      {printf("Flex: found  %s", yytext); return TOK_LOOP;}
 set      {printf("Flex: found  %s", yytext); return TOK_SET;}
 
 
-[a-zA-Z]    {printf("Flex: found character string \"%s\"", yytext); return TOK_CHARACTER_STRING;}
+[a-zA-Z]+    {printf("Flex: found character string \"%s\"", yytext); return TOK_CHARACTER_STRING;}
 [0-9]+      {printf("Flex: found number %s", yytext); return TOK_NUMBER;}
 \n     {/*Pula newline*/} 
-" "     {/*Ignora espaço em branco*/}
+" "+     {printf("Flex: Whitespace"); return TOK_WHITESPACE;}
 .     {fprintf(stderr, "Flex no token matches %s\n", yytext); return TOK_UNINDENTIFIED_TOKEN;}
 
 %%
