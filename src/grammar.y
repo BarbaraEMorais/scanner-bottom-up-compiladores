@@ -14,7 +14,7 @@
 
 %locations
 %define api.pure full
-
+%define parse.error detailed
 
 %union
 {
@@ -26,8 +26,10 @@
   /* custom field */
 }
 
-%token
-    TOK_LPAREN          
+%token TOK_LPAREN "("     
+
+    
+%token 
     TOK_RPAREN          
     TOK_COMMA           
     TOK_SEMICOLON       
@@ -90,6 +92,8 @@
 %% 
 
 integer: {printf("%d", yylval);}
+
+lparen :TOK_LPAREN {}
 
 %%
 

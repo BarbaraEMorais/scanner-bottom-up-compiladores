@@ -10,6 +10,6 @@ int main(int argc, char *argv[])
     int token;
     do{
         token = yyparse();
-    } while (token != -2);
+    } while (token != YYEOF);
     return 0;
 }
