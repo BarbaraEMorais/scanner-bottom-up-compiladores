@@ -39,6 +39,7 @@
     TOK_LITERAL_DELIM
     TOK_MULTILINE_COMMENT_START
     TOK_MULTILINE_COMMENT_END
+    TOK_MARKER
 
 
     TOK_DEFINE
@@ -80,6 +81,7 @@
     TOK_MULT
     TOK_MINUS
     TOK_PLUS
+    TOK_DIVIDE
     TOK_ASSIGN
     TOK_TRUE
     TOK_FALSE
@@ -88,14 +90,16 @@
     TOK_LEFT_ARROW
     TOK_RIGHT_ARROW
 
-    TOK_NUMBER
-    TOK_CHARACTER_STRING
+    TOK_IDENTIFIER
     TOK_WHITESPACE
 
     TOK_UNINDENTIFIED_TOKEN
 ;
 
-%token <int> TOK_INTEGER "integer"
+%token <ival> TOK_INTEGER "integer"
+%token <dval> TOK_DECIMAL "decimal"
+%token <sval> TOK_STRING "string"
+
 
 %% 
 

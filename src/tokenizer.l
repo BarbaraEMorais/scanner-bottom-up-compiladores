@@ -1,16 +1,31 @@
 %{
     //Variáveis e outras definições vem aqui dentro
 #include "grammar.tab.h"
+#include <stdio.h>
+#include <string.h>
 %}
 
 %option noyywrap
 %%
+
+
+\"(\\.|[^"\\])*\"    {
+    /*
+    \"       -> escape do caractere "
+    \\.      -> aceitar qualquer caractere de escape
+    [^"\\] -> aceitar qualquer caractere sem ser " ou \
+    */
+                                                                                                        printf("Flex: found string %s", yytext);
+                                                                                                        sscanf(yytext, "%s", &yylval->sval);
+                                                                                                        printf("%s", &yylval->sval);
+                                                                                                        return TOK_STRING;
+                                                                                                    }
+
 "("             {printf("Flex: ( found!\n"); return TOK_LPAREN;}
 ")"             {printf("Flex: ) found!\n"); return TOK_RPAREN;}
 ","             {printf("Flex: , found!\n"); return TOK_COMMA;}
 ";"             {printf("Flex: ; found!\n"); return TOK_SEMICOLON;}
 "\\"            {printf("Flex: \\ found!\n"); return TOK_BACKSLASH;}
-"\""            {printf("Flex: \" found!\n"); return TOK_STRING_DELIM;}
 "'"             {printf("Flex: ' found!\n"); return TOK_LITERAL_DELIM;}
 "#|"            {printf("Flex: %s found!\n", yytext); return TOK_MULTILINE_COMMENT_START;}
 "|#"            {printf("Flex: %s found!\n", yytext); return TOK_MULTILINE_COMMENT_END;}
@@ -53,10 +68,21 @@ loop            {printf("Flex: found  %s", yytext); return TOK_LOOP;}
 set             {printf("Flex: found  %s", yytext); return TOK_SET;}
 
 
-[a-zA-Z]+       {printf("Flex: found character string \"%s\"", yytext); return TOK_CHARACTER_STRING;}
-[0-9]+          {printf("Flex: found number %s", yytext); return TOK_NUMBER;}
-\n              {/*Pula newline*/} 
-" "+            {printf("Flex: Whitespace"); return TOK_WHITESPACE;}
+([[:alpha:]]|[!$%&*/:<=>?^_-])([[:alnum:]]|[+-.@])*       {
+                                                printf("Flex: found identifer \"%s\"\n", yytext); 
+                                                sscanf(yytext, "%s", &yylval->sval);
+                                                return TOK_IDENTIFIER;}
+[0-9]*"."[0-9]+         {
+                                                printf("Flex: found decimal \"%s\"\n", yytext); 
+                                                yylval->dval = atof(yytext);
+                                                return TOK_DECIMAL;}
+
+[0-9]+          {
+                            printf("Flex: found integer %s", yytext); 
+                            yylval->ival = atoi(yytext);
+                            return TOK_INTEGER;}
+
+(\n|" ")*              {/*Pula newline*/} 
 .               {fprintf(stderr, "Flex no token matches %s\n", yytext); return TOK_UNINDENTIFIED_TOKEN;}
 
 %%
