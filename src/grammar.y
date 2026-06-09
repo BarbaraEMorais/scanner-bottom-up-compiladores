@@ -3,10 +3,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include "symbol_table.h"
+#include "errors.h"
 
 extern int  yylex(void);
 extern int  yylineno;
 extern char *yytext;
+
+int num_errors = 0;
+
+Error* error_list = NULL;
 
 void yyerror(const char *s);
 
@@ -448,6 +453,11 @@ expr_list
     | expr_list expr
     ;
 
+lexical_error
+    : TOK_UNINDENTIFIED_TOKEN
+        {add_error(error_list, LEXICAL_ERROR, "lexical error (Unidentified Token)", yylineno, yylloc.last_column);
+        num_errors++;}
+
 %%
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -455,8 +465,9 @@ expr_list
    ════════════════════════════════════════════════════════════════════════════ */
 
 void yyerror(const char *s) {
-    fprintf(stderr, "[parser] ERRO sintatico (linha %d): %s | ultimo token: '%s'\n",
-            yylineno, s, yytext);
+    num_errors++;
+    fprintf(stderr, "[parser] ERRO sintatico (linha %d, coluna: %d): %s | ultimo token: '%s'\n",
+            yylineno, yylloc.last_column, s, yytext);
 }
 
 int main(void) {
