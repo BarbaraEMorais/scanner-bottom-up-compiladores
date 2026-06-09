@@ -121,7 +121,6 @@ comment
     : TOK_MULTILINE_COMMENT_START token_seq TOK_MULTILINE_COMMENT_END
     ;
 
-/* sequência genérica de qualquer token — usada para engolir conteúdo de comentário */
 token_seq
     : /* vazio */
     | token_seq any_token
@@ -141,13 +140,19 @@ any_token
    ════════════════════════════════════════════════════════════════════════════ */
 
 define_expr
+    /* Bug fix: inserir variavel na tabela ao definir — parte integrada com symbol_table.h */
     : TOK_LPAREN TOK_DEFINE TOK_IDENTIFIER expr TOK_RPAREN
-        { printf("[parser] define variavel: '%s'\n", $3); }
+        {
+            printf("[parser] define variavel: '%s'\n", $3);
+            insert_symbol(table, $3, TYPE_NUMBER);
+        }
 
-    | TOK_LPAREN TOK_DEFINE TOK_LPAREN TOK_IDENTIFIER param_list TOK_RPAREN body TOK_RPAREN
-        { 
-            printf("[parser] define funcao: '%s'\n", $4); 
-            insert_symbol(table, $4, TYPE_NUMBER);
+    /* Bug fix: enter_scope antes dos params para que sejam visíveis no corpo — parte integrada com symbol_table.h */
+    | TOK_LPAREN TOK_DEFINE TOK_LPAREN TOK_IDENTIFIER { enter_scope(table); } param_list TOK_RPAREN body TOK_RPAREN
+        {
+            printf("[parser] define funcao: '%s'\n", $4);
+            insert_symbol(table, $4, TYPE_FUNCTION);
+            exit_scope(table);
         }
     ;
 
@@ -159,7 +164,10 @@ define_expr
 param_list
     : /* vazio — (define (f) ...) */
     | param_list TOK_IDENTIFIER
-        { printf("[parser] parametro: '%s'\n", $2); }
+        {
+            printf("[parser] parametro: '%s'\n", $2);
+            insert_symbol(table, $2, TYPE_NUMBER); /* parte integrada com symbol_table.h */
+        }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -182,7 +190,7 @@ expr
     ;
 
 /* ─── Número com sinal opcional ──────────────────────────────────────────
-   Trata: 123, -123, 3.14, -3.14
+   Trata: 123, 3.14
    O sinal negativo vem como TOK_MINUS separado do Flex, então precisamos
    de uma regra explícita para unificá-los num único valor numérico.        */
 
@@ -213,13 +221,14 @@ atom
     | TOK_STRING
         { printf("[parser] atom string: %s\n", $1); }
     | TOK_IDENTIFIER
-        { 
+        {
             printf("[parser] atom identificador: '%s'\n", $1);
+            /* parte integrada com symbol_table.h */
             Symbol *s = search_symbol(table, $1);
-            if (s==NULL){
+            if (s == NULL) {
                 fprintf(stderr, "[Erro Semantico] Linha %d: Variavel '%s' nao declarada.\n", yylineno, $1);
                 exit(1);
-            } 
+            }
         }
     | TOK_TRUE
         { printf("[parser] atom: #t\n"); }
@@ -308,14 +317,16 @@ cond_clause
    ════════════════════════════════════════════════════════════════════════════ */
 
 let_expr
+    /* Bug fix: enter_scope antes do binding_list — parte integrada com symbol_table.h */
     : TOK_LPAREN TOK_LET { enter_scope(table); } TOK_LPAREN binding_list TOK_RPAREN body TOK_RPAREN
-        { 
-            printf("[parser] let\n"); 
+        {
+            printf("[parser] let\n");
             exit_scope(table);
         }
-    | TOK_LPAREN TOK_LETREC TOK_LPAREN binding_list TOK_RPAREN body TOK_RPAREN
-        { 
-            printf("[parser] letrec\n"); 
+    /* Bug fix: letrec também precisa de enter_scope — parte integrada com symbol_table.h */
+    | TOK_LPAREN TOK_LETREC { enter_scope(table); } TOK_LPAREN binding_list TOK_RPAREN body TOK_RPAREN
+        {
+            printf("[parser] letrec\n");
             exit_scope(table);
         }
     ;
@@ -327,9 +338,9 @@ binding_list
 
 binding
     : TOK_LPAREN TOK_IDENTIFIER expr TOK_RPAREN
-        { 
-            printf("[parser] binding: '%s'\n", $2); 
-            insert_symbol(table, $2, TYPE_NUMBER);
+        {
+            printf("[parser] binding: '%s'\n", $2);
+            insert_symbol(table, $2, TYPE_NUMBER); /* parte integrada com symbol_table.h */
         }
     ;
 
@@ -400,7 +411,15 @@ expr_in_list_item
     | TOK_STRING
         { printf("[parser] atom string: %s\n", $1); }
     | TOK_IDENTIFIER
-        { printf("[parser] atom identificador: '%s'\n", $1); }
+                {
+            printf("[parser] atom identificador: '%s'\n", $1);
+            /* parte integrada com symbol_table.h */
+            Symbol *s = search_symbol(table, $1);
+            if (s == NULL) {
+                fprintf(stderr, "[Erro Semantico] Linha %d: Variavel '%s' nao declarada.\n", yylineno, $1);
+                exit(1);
+            }
+        }
     | TOK_TRUE
         { printf("[parser] atom: #t\n"); }
     | TOK_FALSE
@@ -443,7 +462,7 @@ void yyerror(const char *s) {
 int main(void) {
     printf("=== Parser Scheme ===\n");
 
-    table = create_symbol_table();
+    table = create_symbol_table(); /* parte integrada com symbol_table.h */
 
     int result = yyparse();
     if (result == 0)
@@ -451,7 +470,7 @@ int main(void) {
     else
         printf("=== Parsing falhou ===\n");
 
-    free(table);
+    free(table); /* parte integrada com symbol_table.h */
 
     return result;
 }
