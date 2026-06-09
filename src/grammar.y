@@ -106,6 +106,7 @@ program
 top_level_list
     : top_level_expr
     | top_level_list top_level_expr
+    | top_level_list error {yyerrok;}
     ;
 
 top_level_expr
@@ -115,6 +116,7 @@ top_level_expr
         { printf("[parser] top-level: expressao\n"); }
     | comment
         { printf("[parser] top-level: comentario ignorado\n"); }
+    | error '\n' {yyerrok;}
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -453,10 +455,6 @@ expr_list
     | expr_list expr
     ;
 
-lexical_error
-    : TOK_UNINDENTIFIED_TOKEN
-        {add_error(error_list, LEXICAL_ERROR, "lexical error (Unidentified Token)", yylineno, yylloc.last_column);
-        num_errors++;}
 
 %%
 
