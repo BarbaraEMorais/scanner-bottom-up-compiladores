@@ -450,6 +450,7 @@ expr_in_list_item
     | TOK_RIGHT_ARROW
         { printf("[parser] atom operador: >\n"); }
     | list_expr
+    | error TOK_RPAREN {yyerrok;}
     ;
 
 /* ─── Lista de expressões (zero ou mais) ─────────────────────────────────── */
@@ -469,7 +470,7 @@ expr_list
 void yyerror(const char *s) {
     extern char* yytext;
     fprintf(stderr, "[parser] ERRO %d sintático (linha %d, coluna: %d): %s | ultimo token: '%s'\n",
-            yynerrs, yylineno, yylloc.last_column, s, yytext);
+            yynerrs, yylloc.last_line, yylloc.last_column, s, yytext);
 }
 
 int main(void) {
