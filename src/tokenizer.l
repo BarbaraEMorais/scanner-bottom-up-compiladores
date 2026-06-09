@@ -6,6 +6,8 @@
 %}
 
 %option noyywrap
+%option noinput
+%option nounput
 %%
 
 
@@ -81,7 +83,7 @@ set             {printf("Flex: found  %s", yytext); return TOK_SET;}
                             yylval.ival = atoi(yytext);
                             return TOK_INTEGER;}
 
-(\n|" ")*              {/*Pula newline*/} 
+[ \t\n\r]+    { /* Pula newline, tabs e novas linhas de forma segura */ }
 .               {fprintf(stderr, "Flex no token matches %s\n", yytext); return TOK_UNINDENTIFIED_TOKEN;}
 
 %%
