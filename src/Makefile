@@ -3,7 +3,7 @@ compile: flex.yy.c
 flex.yy.c: bison
 	flex --bison-bridge --bison-locations *.l 
 bison:
-	bison -k -H --locations *.y
+	bison -H --locations *.y
 
 clean:
 	rm -f lex.yy.c main *.o
