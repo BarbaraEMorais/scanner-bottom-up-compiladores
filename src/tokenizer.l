@@ -3,6 +3,7 @@
 #include "grammar.tab.h"
 #include <stdio.h>
 #include <string.h>
+
 %}
 
 %option noyywrap
