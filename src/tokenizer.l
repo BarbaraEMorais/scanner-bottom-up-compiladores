@@ -16,8 +16,7 @@
     [^"\\] -> aceitar qualquer caractere sem ser " ou \
     */
                                                                                                         printf("Flex: found string %s", yytext);
-                                                                                                        sscanf(yytext, "%s", &yylval->sval);
-                                                                                                        printf("%s", &yylval->sval);
+                                                                                                        yylval.sval = strdup(yytext);
                                                                                                         return TOK_STRING;
                                                                                                     }
 
@@ -68,18 +67,18 @@ loop            {printf("Flex: found  %s", yytext); return TOK_LOOP;}
 set             {printf("Flex: found  %s", yytext); return TOK_SET;}
 
 
-([[:alpha:]]|[!$%&*/:<=>?^_-])([[:alnum:]]|[+-.@])*       {
+([[:alpha:]]|[!$%&*/:<=>?^_])([[:alnum:]]|[+-.@])*       {
                                                 printf("Flex: found identifer \"%s\"\n", yytext); 
-                                                sscanf(yytext, "%s", &yylval->sval);
+                                                yylval.sval = strdup(yytext);
                                                 return TOK_IDENTIFIER;}
 [0-9]*"."[0-9]+         {
                                                 printf("Flex: found decimal \"%s\"\n", yytext); 
-                                                yylval->dval = atof(yytext);
+                                                yylval.dval = atof(yytext);
                                                 return TOK_DECIMAL;}
 
 [0-9]+          {
                             printf("Flex: found integer %s", yytext); 
-                            yylval->ival = atoi(yytext);
+                            yylval.ival = atoi(yytext);
                             return TOK_INTEGER;}
 
 (\n|" ")*              {/*Pula newline*/} 

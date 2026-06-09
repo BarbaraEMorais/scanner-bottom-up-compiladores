@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Declarações externas do scanner (gerado pelo Flex) */
 extern int  yylex(void);
 extern int  yylineno;
 extern char *yytext;
@@ -13,58 +12,86 @@ void yyerror(const char *s);
 
 /* ─── Tipos de valor dos tokens ─────────────────────────────────────────── */
 %union {
-    int    ival;   /* TOK_INTEGER              */
-    double dval;   /* TOK_FLOAT (futuro)       */
-    char  *sval;   /* TOK_IDENTIFIER, TOK_STRING */
+    int    ival;   /* TOK_INTEGER                  */
+    double dval;   /* TOK_DECIMAL                  */
+    char  *sval;   /* TOK_IDENTIFIER, TOK_STRING   */
 }
 
-/* ─── Tokens sem valor ───────────────────────────────────────────────────── */
+/* ─── Tokens sem valor — espelhados exatamente do .l ────────────────────── */
 %token TOK_LPAREN
 %token TOK_RPAREN
+%token TOK_COMMA
+%token TOK_SEMICOLON
+%token TOK_BACKSLASH
+%token TOK_LITERAL_DELIM
+%token TOK_MULTILINE_COMMENT_START
+%token TOK_MULTILINE_COMMENT_END
+%token TOK_VERTICAL_LINE
+%token TOK_LEFT_ARROW
+%token TOK_RIGHT_ARROW
+%token TOK_UNINDENTIFIED_TOKEN
+
+/* Operadores */
+%token TOK_PLUS
+%token TOK_MINUS
+%token TOK_MULT
+%token TOK_DIVIDE
+%token TOK_EQUAL
+
+/* Booleanos */
+%token TOK_TRUE
+%token TOK_FALSE
+
+/* Palavras-chave */
 %token TOK_DEFINE
 %token TOK_LAMBDA
 %token TOK_IF
 %token TOK_ELSE
 %token TOK_COND
-%token TOK_LET
-%token TOK_LETREC
-%token TOK_BEGIN
+%token TOK_CASE
 %token TOK_AND
 %token TOK_OR
 %token TOK_NOT
+%token TOK_WHEN
+%token TOK_LET
+%token TOK_LETREC
+%token TOK_BEGIN
 %token TOK_SET
-%token TOK_CONS
-%token TOK_EQ
-%token TOK_TRUE
-%token TOK_FALSE
-%token TOK_PLUS
-%token TOK_MINUS
-%token TOK_MULT
-%token TOK_DIV
+%token TOK_DO
+%token TOK_DELAY
+%token TOK_GUARD
+%token TOK_LOOP
+%token TOK_EXPORT
+%token TOK_RENAME
+%token TOK_ONLY
+%token TOK_EXCEPT
 
 /* ─── Tokens com valor ───────────────────────────────────────────────────── */
 %token <ival> TOK_INTEGER
-%token <dval> TOK_FLOAT
+%token <dval> TOK_DECIMAL
 %token <sval> TOK_IDENTIFIER
 %token <sval> TOK_STRING
 
-/* ─── Tipos das regras (para quando a Bárbara adicionar AST) ─────────────── */
-/*
- * Quando a AST for implementada, adicionar aqui:
- *   %type <node> program expr expr_list define ...
- * e incluir "ASTNode *node" na union acima.
- */
+/* ─── Tipos das regras (descomentar quando Bárbara adicionar AST) ────────── */
+/* %type <node> program top_level_expr define_expr expr atom list_expr */
+/* %type <node> lambda_expr if_expr cond_expr let_expr begin_expr set_expr call_expr */
+
+/* ─── Precedência para resolver ambiguidade do sinal negativo ────────────
+   TOK_UMINUS é um token fictício de alta precedência.
+   Marca as regras de negative_number para que o Bison prefira shift
+   (juntar - com número) em vez de reduce (tratar - como operador átomo). */
+%right TOK_UMINUS
 
 %%
 
 /* ════════════════════════════════════════════════════════════════════════════
    PROGRAMA
-   Um programa Scheme é uma sequência de uma ou mais expressões de nível
-   superior (top-level). Ex: vários (define ...) seguidos.
+   Sequência de expressões de nível superior.
    ════════════════════════════════════════════════════════════════════════════ */
 
 program
     : top_level_list
+        { printf("[parser] programa completo\n"); }
     ;
 
 top_level_list
@@ -72,45 +99,65 @@ top_level_list
     | top_level_list top_level_expr
     ;
 
-/* Uma expressão de topo pode ser um define ou uma expressão comum */
 top_level_expr
-    : define_expr       { printf("[parser] define reconhecido\n"); }
-    | expr              { printf("[parser] expressao reconhecida\n"); }
+    : define_expr
+        { printf("[parser] top-level: define\n"); }
+    | expr
+        { printf("[parser] top-level: expressao\n"); }
+    | comment
+        { printf("[parser] top-level: comentario ignorado\n"); }
+    ;
+
+/* ════════════════════════════════════════════════════════════════════════════
+   COMENTÁRIOS MULTILINE
+   #| qualquer coisa |#  — ignorado semanticamente
+   ════════════════════════════════════════════════════════════════════════════ */
+
+comment
+    : TOK_MULTILINE_COMMENT_START token_seq TOK_MULTILINE_COMMENT_END
+    ;
+
+/* sequência genérica de qualquer token — usada para engolir conteúdo de comentário */
+token_seq
+    : /* vazio */
+    | token_seq any_token
+    ;
+
+any_token
+    : TOK_INTEGER | TOK_DECIMAL | TOK_STRING | TOK_IDENTIFIER
+    | TOK_LPAREN  | TOK_RPAREN  | TOK_PLUS   | TOK_MINUS
+    | TOK_MULT    | TOK_DIVIDE  | TOK_EQUAL  | TOK_TRUE | TOK_FALSE
+    | TOK_IF      | TOK_ELSE    | TOK_DEFINE | TOK_LAMBDA
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
    DEFINE
-   Duas formas:
-     (define <id> <expr>)               → variável
-     (define (<id> <params>) <body>)    → função
+   (define <id> <expr>)              → variável
+   (define (<id> <params>) <body>)   → função
    ════════════════════════════════════════════════════════════════════════════ */
 
 define_expr
-    /* (define x 10) */
     : TOK_LPAREN TOK_DEFINE TOK_IDENTIFIER expr TOK_RPAREN
-        { printf("[parser] define variavel: %s\n", $3); }
+        { printf("[parser] define variavel: '%s'\n", $3); }
 
-    /* (define (f x y) corpo...) */
     | TOK_LPAREN TOK_DEFINE TOK_LPAREN TOK_IDENTIFIER param_list TOK_RPAREN body TOK_RPAREN
-        { printf("[parser] define funcao: %s\n", $4); }
+        { printf("[parser] define funcao: '%s'\n", $4); }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
    PARÂMETROS
-   Lista de identificadores usada na definição de função.
-   Ex: (define (f x y z) ...)  →  param_list = x y z
+   Lista de identificadores: (define (f x y z) ...)
    ════════════════════════════════════════════════════════════════════════════ */
 
 param_list
-    : /* vazio — função sem parâmetros: (define (f) ...) */
+    : /* vazio — (define (f) ...) */
     | param_list TOK_IDENTIFIER
+        { printf("[parser] parametro: '%s'\n", $2); }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
-   CORPO (body)
-   Um ou mais expressões no corpo de um define/lambda/let.
-   Ex: (define (f x) (+ x 1))           → uma expressão
-       (define (f x) (display x) (+ x 1)) → duas expressões
+   CORPO
+   Uma ou mais expressões.
    ════════════════════════════════════════════════════════════════════════════ */
 
 body
@@ -120,7 +167,6 @@ body
 
 /* ════════════════════════════════════════════════════════════════════════════
    EXPRESSÃO
-   Núcleo da gramática. Toda construção Scheme é uma expressão.
    ════════════════════════════════════════════════════════════════════════════ */
 
 expr
@@ -128,20 +174,63 @@ expr
     | list_expr
     ;
 
-/* ─── Átomos ────────────────────────────────────────────────────────────────
-   Valores primitivos que não precisam de parênteses.                        */
-atom
-    : TOK_INTEGER     { printf("[parser] inteiro: %d\n", $1); }
-    | TOK_FLOAT       { printf("[parser] float: %f\n", $1); }
-    | TOK_STRING      { printf("[parser] string: %s\n", $1); }
-    | TOK_IDENTIFIER  { printf("[parser] identificador: %s\n", $1); }
-    | TOK_TRUE        { printf("[parser] #t\n"); }
-    | TOK_FALSE       { printf("[parser] #f\n"); }
+/* ─── Número com sinal opcional ──────────────────────────────────────────
+   Trata: 123, -123, 3.14, -3.14
+   O sinal negativo vem como TOK_MINUS separado do Flex, então precisamos
+   de uma regra explícita para unificá-los num único valor numérico.        */
+
+number
+    : TOK_INTEGER
+        { printf("[parser] numero inteiro: %d\n", $1); }
+    | TOK_DECIMAL
+        { printf("[parser] numero decimal: %f\n", $1); }
     ;
 
-/* ─── Listas / Formas especiais ─────────────────────────────────────────────
-   Tudo entre parênteses.
-   A ordem das alternativas importa: formas especiais antes de call_expr.    */
+/* ─── Número negativo — só válido como átomo isolado ─────────────────────
+   (- 123 456) → o TOK_MINUS é operador em call_expr, NÃO entra aqui
+   -456 sozinho → TOK_MINUS + TOK_INTEGER reduz para negative_number
+   A separação evita que (- 123 456) consuma o - junto com o 123.        */
+
+negative_number
+    : TOK_MINUS TOK_INTEGER %prec TOK_UMINUS
+        { printf("[parser] numero inteiro negativo: -%d\n", $2); }
+    | TOK_MINUS TOK_DECIMAL %prec TOK_UMINUS
+        { printf("[parser] numero decimal negativo: -%f\n", $2); }
+    ;
+
+/* ─── Átomos ─────────────────────────────────────────────────────────────── */
+
+atom
+    : number
+    | negative_number
+    | TOK_STRING
+        { printf("[parser] atom string: %s\n", $1); }
+    | TOK_IDENTIFIER
+        { printf("[parser] atom identificador: '%s'\n", $1); }
+    | TOK_TRUE
+        { printf("[parser] atom: #t\n"); }
+    | TOK_FALSE
+        { printf("[parser] atom: #f\n"); }
+    /* Operadores como átomos — necessário para (+ a b), (* x y), etc.
+       TOK_MINUS removido daqui — tratado em negative_number para evitar
+       conflito shift/reduce com "-456".                               */
+    | TOK_PLUS
+        { printf("[parser] atom operador: +\n"); }
+    | TOK_MULT
+        { printf("[parser] atom operador: *\n"); }
+    | TOK_DIVIDE
+        { printf("[parser] atom operador: /\n"); }
+    | TOK_EQUAL
+        { printf("[parser] atom operador: =\n"); }
+    | TOK_LEFT_ARROW
+        { printf("[parser] atom operador: <\n"); }
+    | TOK_RIGHT_ARROW
+        { printf("[parser] atom operador: >\n"); }
+    ;
+
+/* ─── Listas / Formas especiais ──────────────────────────────────────────── */
+/* ATENÇÃO: call_expr deve vir por último — é o caso genérico */
+
 list_expr
     : lambda_expr
     | if_expr
@@ -149,7 +238,9 @@ list_expr
     | let_expr
     | begin_expr
     | set_expr
-    | call_expr       /* chamada de função genérica — deve vir por último */
+    | when_expr
+    | and_or_expr
+    | call_expr
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -170,14 +261,14 @@ lambda_expr
 
 if_expr
     : TOK_LPAREN TOK_IF expr expr TOK_RPAREN
-        { printf("[parser] if (sem else)\n"); }
+        { printf("[parser] if sem else\n"); }
     | TOK_LPAREN TOK_IF expr expr expr TOK_RPAREN
         { printf("[parser] if-else\n"); }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
    COND
-   (cond (<test> <expr>) ... (else <expr>))
+   (cond (<test> <expr>...) ... (else <expr>...))
    ════════════════════════════════════════════════════════════════════════════ */
 
 cond_expr
@@ -191,10 +282,10 @@ cond_clause_list
     ;
 
 cond_clause
-    /* (teste expr...) */
     : TOK_LPAREN expr expr_list TOK_RPAREN
-    /* (else expr...) */
+        { printf("[parser] cond clause\n"); }
     | TOK_LPAREN TOK_ELSE expr_list TOK_RPAREN
+        { printf("[parser] cond else\n"); }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -216,7 +307,7 @@ binding_list
 
 binding
     : TOK_LPAREN TOK_IDENTIFIER expr TOK_RPAREN
-        { printf("[parser] binding: %s\n", $2); }
+        { printf("[parser] binding: '%s'\n", $2); }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -236,27 +327,84 @@ begin_expr
 
 set_expr
     : TOK_LPAREN TOK_SET TOK_IDENTIFIER expr TOK_RPAREN
-        { printf("[parser] set!: %s\n", $3); }
+        { printf("[parser] set!: '%s'\n", $3); }
+    ;
+
+/* ════════════════════════════════════════════════════════════════════════════
+   WHEN
+   (when <cond> <body>)
+   ════════════════════════════════════════════════════════════════════════════ */
+
+when_expr
+    : TOK_LPAREN TOK_WHEN expr body TOK_RPAREN
+        { printf("[parser] when\n"); }
+    ;
+
+/* ════════════════════════════════════════════════════════════════════════════
+   AND / OR
+   (and expr...) / (or expr...)
+   ════════════════════════════════════════════════════════════════════════════ */
+
+and_or_expr
+    : TOK_LPAREN TOK_AND expr_list TOK_RPAREN
+        { printf("[parser] and\n"); }
+    | TOK_LPAREN TOK_OR expr_list TOK_RPAREN
+        { printf("[parser] or\n"); }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
    CHAMADA DE FUNÇÃO GENÉRICA
    (operador arg arg ...)
-   Cobre: (+ 1 2), (f x y), (display x), etc.
+   Cobre: (+ 1 2), (f x y), (display x), (< a b), etc.
    ════════════════════════════════════════════════════════════════════════════ */
 
 call_expr
-    : TOK_LPAREN expr expr_list TOK_RPAREN
-        { printf("[parser] chamada de funcao\n"); }
+    : TOK_LPAREN expr_in_list_item expr_in_list TOK_RPAREN
+        { printf("[parser] call\n"); }
+    ;
+
+/* ─── Lista de expressões dentro de parênteses (zero ou mais) ───────────────
+   Usa expr_in_list em vez de expr para que TOK_MINUS seja sempre operador
+   dentro de listas, nunca sinal de número negativo.                        */
+
+expr_in_list
+    : /* vazio */
+    | expr_in_list expr_in_list_item
+    ;
+
+expr_in_list_item
+    : number
+    | TOK_STRING
+        { printf("[parser] atom string: %s\n", $1); }
+    | TOK_IDENTIFIER
+        { printf("[parser] atom identificador: '%s'\n", $1); }
+    | TOK_TRUE
+        { printf("[parser] atom: #t\n"); }
+    | TOK_FALSE
+        { printf("[parser] atom: #f\n"); }
+    | TOK_PLUS
+        { printf("[parser] atom operador: +\n"); }
+    | TOK_MINUS
+        { printf("[parser] atom operador: -\n"); }
+    | TOK_MULT
+        { printf("[parser] atom operador: *\n"); }
+    | TOK_DIVIDE
+        { printf("[parser] atom operador: /\n"); }
+    | TOK_EQUAL
+        { printf("[parser] atom operador: =\n"); }
+    | TOK_LEFT_ARROW
+        { printf("[parser] atom operador: <\n"); }
+    | TOK_RIGHT_ARROW
+        { printf("[parser] atom operador: >\n"); }
+    | list_expr
     ;
 
 /* ─── Lista de expressões (zero ou mais) ─────────────────────────────────── */
+
 expr_list
     : /* vazio */
     | expr_list expr
     ;
-
-lparen :TOK_LPAREN {}
 
 %%
 
@@ -265,7 +413,8 @@ lparen :TOK_LPAREN {}
    ════════════════════════════════════════════════════════════════════════════ */
 
 void yyerror(const char *s) {
-    fprintf(stderr, "Erro sintático (linha %d): %s\n", yylineno, s);
+    fprintf(stderr, "[parser] ERRO sintatico (linha %d): %s | ultimo token: '%s'\n",
+            yylineno, s, yytext);
 }
 
 int main(void) {
