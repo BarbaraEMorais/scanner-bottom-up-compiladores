@@ -2,12 +2,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "symbol_table.h"
 
 extern int  yylex(void);
 extern int  yylineno;
 extern char *yytext;
 
 void yyerror(const char *s);
+
+SymbolTable *table;
+
 %}
 
 /* ─── Tipos de valor dos tokens ─────────────────────────────────────────── */
@@ -141,7 +145,10 @@ define_expr
         { printf("[parser] define variavel: '%s'\n", $3); }
 
     | TOK_LPAREN TOK_DEFINE TOK_LPAREN TOK_IDENTIFIER param_list TOK_RPAREN body TOK_RPAREN
-        { printf("[parser] define funcao: '%s'\n", $4); }
+        { 
+            printf("[parser] define funcao: '%s'\n", $4); 
+            insert_symbol(table, $4, TYPE_NUMBER);
+        }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -206,7 +213,14 @@ atom
     | TOK_STRING
         { printf("[parser] atom string: %s\n", $1); }
     | TOK_IDENTIFIER
-        { printf("[parser] atom identificador: '%s'\n", $1); }
+        { 
+            printf("[parser] atom identificador: '%s'\n", $1);
+            Symbol *s = search_symbol(table, $1);
+            if (s==NULL){
+                fprintf(stderr, "[Erro Semantico] Linha %d: Variavel '%s' nao declarada.\n", yylineno, $1);
+                exit(1);
+            } 
+        }
     | TOK_TRUE
         { printf("[parser] atom: #t\n"); }
     | TOK_FALSE
@@ -294,10 +308,16 @@ cond_clause
    ════════════════════════════════════════════════════════════════════════════ */
 
 let_expr
-    : TOK_LPAREN TOK_LET TOK_LPAREN binding_list TOK_RPAREN body TOK_RPAREN
-        { printf("[parser] let\n"); }
+    : TOK_LPAREN TOK_LET { enter_scope(table); } TOK_LPAREN binding_list TOK_RPAREN body TOK_RPAREN
+        { 
+            printf("[parser] let\n"); 
+            exit_scope(table);
+        }
     | TOK_LPAREN TOK_LETREC TOK_LPAREN binding_list TOK_RPAREN body TOK_RPAREN
-        { printf("[parser] letrec\n"); }
+        { 
+            printf("[parser] letrec\n"); 
+            exit_scope(table);
+        }
     ;
 
 binding_list
@@ -307,7 +327,10 @@ binding_list
 
 binding
     : TOK_LPAREN TOK_IDENTIFIER expr TOK_RPAREN
-        { printf("[parser] binding: '%s'\n", $2); }
+        { 
+            printf("[parser] binding: '%s'\n", $2); 
+            insert_symbol(table, $2, TYPE_NUMBER);
+        }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -419,10 +442,16 @@ void yyerror(const char *s) {
 
 int main(void) {
     printf("=== Parser Scheme ===\n");
+
+    table = create_symbol_table();
+
     int result = yyparse();
     if (result == 0)
         printf("=== Parsing concluido com sucesso ===\n");
     else
         printf("=== Parsing falhou ===\n");
+
+    free(table);
+
     return result;
 }
