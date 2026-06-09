@@ -99,6 +99,8 @@ set             {printf("Flex: found  %s", yytext); return TOK_SET;}
                             return TOK_INTEGER;}
 
 [ \t\n\r]+    { /* Pula newline, tabs e novas linhas de forma segura */ }
-.               {fprintf(stderr, "Flex no token matches %s\n", yytext); return TOK_UNINDENTIFIED_TOKEN;}
-
+.               {
+                    extern int yynerrs;
+                    fprintf(stderr, "LEXICAL ERROR(Line: %d, Column %d): no token matches %s\n", yylloc.last_line, yylloc.last_column, yytext); 
+                    yynerrs++;}
 %%

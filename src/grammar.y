@@ -5,6 +5,8 @@
 #include "symbol_table.h"
 #include "errors.h"
 
+#define YYDEBUG 1
+
 extern int  yylex(void);
 extern int  yylineno;
 extern char *yytext;
@@ -18,6 +20,8 @@ void yyerror(const char *s);
 SymbolTable *table;
 
 %}
+
+%define parse.error verbose
 
 /* ─── Tipos de valor dos tokens ─────────────────────────────────────────── */
 %union {
@@ -101,12 +105,13 @@ SymbolTable *table;
 program
     : top_level_list
         { printf("[parser] programa completo\n"); }
+    | program error '\n' {yyerrok; }
+    | program error <<EOF>> {yyerrok; }
     ;
 
 top_level_list
     : top_level_expr
     | top_level_list top_level_expr
-    | top_level_list error {yyerrok;}
     ;
 
 top_level_expr
@@ -116,7 +121,6 @@ top_level_expr
         { printf("[parser] top-level: expressao\n"); }
     | comment
         { printf("[parser] top-level: comentario ignorado\n"); }
-    | error '\n' {yyerrok;}
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -125,7 +129,7 @@ top_level_expr
    ════════════════════════════════════════════════════════════════════════════ */
 
 comment
-    : TOK_MULTILINE_COMMENT_START token_seq TOK_MULTILINE_COMMENT_END
+    : TOK_MULTILINE_COMMENT_START token_seq TOK_MULTILINE_COMMENT_END {}
     ;
 
 token_seq
@@ -463,9 +467,9 @@ expr_list
    ════════════════════════════════════════════════════════════════════════════ */
 
 void yyerror(const char *s) {
-    num_errors++;
-    fprintf(stderr, "[parser] ERRO sintatico (linha %d, coluna: %d): %s | ultimo token: '%s'\n",
-            yylineno, yylloc.last_column, s, yytext);
+    extern char* yytext;
+    fprintf(stderr, "[parser] ERRO %d sintático (linha %d, coluna: %d): %s | ultimo token: '%s'\n",
+            yynerrs, yylineno, yylloc.last_column, s, yytext);
 }
 
 int main(void) {
@@ -481,5 +485,6 @@ int main(void) {
 
     free(table); /* parte integrada com symbol_table.h */
 
+        printf("Número de erros: %d", yynerrs);
     return result;
 }
