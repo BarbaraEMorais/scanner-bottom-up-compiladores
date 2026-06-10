@@ -237,6 +237,7 @@ atom
             /* parte integrada com symbol_table.h */
             Symbol *s = search_symbol(table, $1);
             if (s == NULL) {
+                yynerrs++;
                 yyerror("[Erro Semantico]: Variável não declarada");
                 //fprintf(stderr, "[Erro Semantico] Linha %d: Variavel '%s' nao declarada.\n", yylineno, $1);
             }
@@ -427,6 +428,7 @@ expr_in_list_item
             /* parte integrada com symbol_table.h */
             Symbol *s = search_symbol(table, $1);
             if (s == NULL) {
+                yynerrs++;
                 yyerror("[Erro Semantico]: Variável não declarada");
                 //fprintf(stderr, "[Erro Semantico] Linha %d: Variavel '%s' nao declarada.\n", yylineno, $1);
             }
