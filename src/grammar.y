@@ -387,10 +387,11 @@ int main(void) {
 
     if (result == 0) {
         printf("\n=== AST ===\n");
-        if (ast_root)
+        if (ast_root){
             print_ast(ast_root, 0);
             
             generate(ast_root, "out.py");
+        }
         else
             printf("[Aviso] Arvore vazia.\n");
         printf("===========\n");

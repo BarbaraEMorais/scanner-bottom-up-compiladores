@@ -114,7 +114,7 @@ char* navigate_node(ASTNode* node, int identation_level, FILE** fptr){
                     node_navigator = node_navigator->next;
                 }
 
-                fprintf(*definitions_file_ptr, "):\n");
+                fprintf(*definitions_file_ptr, " ):\n");
 
                 node_navigator = node->lambda_expr.body;
 
@@ -128,6 +128,7 @@ char* navigate_node(ASTNode* node, int identation_level, FILE** fptr){
                 fprintf(*definitions_file_ptr, "return ");
 
                 navigate_node(node_navigator, 0, definitions_file_ptr);
+                fprintf(*definitions_file_ptr,"\n\n");
 
                 fprintf(*fptr, "lambda%d (", num_aux_created);
 
@@ -143,8 +144,7 @@ char* navigate_node(ASTNode* node, int identation_level, FILE** fptr){
                     node_navigator = node_navigator->next;
                 }
 
-                fprintf(*fptr, "\n");
-
+                fprintf(*fptr, ")");
 
                 num_aux_created++;
                 break;
@@ -162,7 +162,7 @@ void generate(ASTNode* root, char* file_name){
     FILE* aux_files = fopen("aux.py", "a");
     definitions_file_ptr = &aux_files;
 
-    fprintf(fptr, "import aux");
+    fprintf(fptr, "import aux\n");
     navigate_node(root, 0, &fptr);
     
     fprintf(fptr, "\n");
