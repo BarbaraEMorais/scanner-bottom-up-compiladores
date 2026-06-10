@@ -1,5 +1,6 @@
 %{
     //Variáveis e outras definições vem aqui dentro
+#include "AST/ast.h" 
 #include "grammar.tab.h"
 #include <stdio.h>
 #include <string.h>
