@@ -4,6 +4,7 @@
 #include <string.h>
 #include "symbol_table.h"
 #include "AST/ast.h"
+#include "code_generator.h"
 
 #define YYDEBUG 1
 
@@ -388,6 +389,8 @@ int main(void) {
         printf("\n=== AST ===\n");
         if (ast_root)
             print_ast(ast_root, 0);
+            
+            generate(ast_root, "out.py");
         else
             printf("[Aviso] Arvore vazia.\n");
         printf("===========\n");
