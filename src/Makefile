@@ -1,5 +1,5 @@
 compile: flex.yy.c
-	gcc -g -Wall -Wextra *.c -o main
+	gcc -g -Wall -Wextra *.c AST/*.c -o main
 flex.yy.c: bison
 	flex  *.l 
 bison:

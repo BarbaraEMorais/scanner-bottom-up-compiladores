@@ -237,8 +237,8 @@ atom
             /* parte integrada com symbol_table.h */
             Symbol *s = search_symbol(table, $1);
             if (s == NULL) {
-                fprintf(stderr, "[Erro Semantico] Linha %d: Variavel '%s' nao declarada.\n", yylineno, $1);
-                exit(1);
+                yyerror("[Erro Semantico]: Variável não declarada");
+                //fprintf(stderr, "[Erro Semantico] Linha %d: Variavel '%s' nao declarada.\n", yylineno, $1);
             }
         }
     | TOK_TRUE
@@ -427,8 +427,8 @@ expr_in_list_item
             /* parte integrada com symbol_table.h */
             Symbol *s = search_symbol(table, $1);
             if (s == NULL) {
-                fprintf(stderr, "[Erro Semantico] Linha %d: Variavel '%s' nao declarada.\n", yylineno, $1);
-                exit(1);
+                yyerror("[Erro Semantico]: Variável não declarada");
+                //fprintf(stderr, "[Erro Semantico] Linha %d: Variavel '%s' nao declarada.\n", yylineno, $1);
             }
         }
     | TOK_TRUE
@@ -469,7 +469,7 @@ expr_list
 
 void yyerror(const char *s) {
     extern char* yytext;
-    fprintf(stderr, "[parser] ERRO %d sintático (linha %d, coluna: %d): %s | ultimo token: '%s'\n",
+    fprintf(stderr, "[parser] ERRO %d (linha %d, coluna: %d):\n%s | ultimo token: '%s'\n",
             yynerrs, yylloc.last_line, yylloc.last_column, s, yytext);
 }
 
