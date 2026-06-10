@@ -34,6 +34,27 @@ void test_if() {
     generate(node, "if.py");
 }
 
+void test_all(){
+
+    ASTNode *cond = create_binary_operation('<', 
+                                                                                create_binary_operation('+',
+                                                                                    create_identifier("a"),
+                                                                                    create_number(3)), create_number(5));
+    
+    ASTNode *then = create_identifier("OK");
+    ASTNode *else_branch_left = create_define("a", create_number(4));
+    ASTNode *else_branch_right = create_define("b", create_number(3));
+
+                                                            
+
+    ASTNode* else_branch = create_if(create_binary_operation('>', create_identifier("a"), create_number(6)), else_branch_left, else_branch_right);
+
+    ASTNode* root = create_if(cond, then,else_branch);
+
+
+    generate(root, "all.py");
+}
+
 int main(){
     test_number();
 
@@ -44,5 +65,7 @@ int main(){
     test_define();
 
     test_binary_operation();
+
+    test_all();
 }
 

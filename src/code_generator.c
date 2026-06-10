@@ -17,9 +17,8 @@ char* get_idents(char* base, int identation_level){
 #define BUF_SIZE 9999
 
 char* navigate_node(ASTNode* node, int identation_level, FILE** fptr){
-    int curr_ident = identation_level;
     char idents[BUF_SIZE];
-    get_idents(idents,  curr_ident);
+    get_idents(idents,  identation_level);
     int temp_ident_store = 0;
     switch (node->type) {
         case NODE_NUMBER:
@@ -39,22 +38,27 @@ char* navigate_node(ASTNode* node, int identation_level, FILE** fptr){
             fprintf(*fptr, "%s\n", idents);
             break;
         case NODE_IF:
-            fprintf(*fptr, "%sif", idents);
+            fprintf(*fptr, "%sif ", idents);
             navigate_node(node->if_stmt.condition, 0, fptr);
             fprintf(*fptr, ":\n");
 
-            navigate_node(node->if_stmt.then_branch, curr_ident+1, fptr);
+            navigate_node(node->if_stmt.then_branch, identation_level+1, fptr);
 
-            fprintf(*fptr, "%selse:\n", idents);
-            navigate_node(node->if_stmt.else_branch, curr_ident+1, fptr);
             fprintf(*fptr, "\n");
+
+            if (node->if_stmt.else_branch != NULL){
+                fprintf(*fptr, "%selse:", idents);
+                fprintf(*fptr, "\n");
+                navigate_node(node->if_stmt.else_branch, identation_level+1, fptr);
+                fprintf(*fptr, "\n");    
+            }
+            
             break;
         default:
             fprintf(stderr, "AST ERROR: node type %d is not a  defined type", node->type);
             return NULL;
     }
 
-    printf("%s", idents);
 }
 
 void generate(ASTNode* root, char* file_name){
@@ -62,6 +66,8 @@ void generate(ASTNode* root, char* file_name){
 
     navigate_node(root, 0, &fptr);
     
+    fprintf(fptr, "\n");
+
     fclose(fptr);
     
 }
