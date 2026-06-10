@@ -94,9 +94,25 @@ char* navigate_node(ASTNode* node, int identation_level, FILE** fptr){
                 break;
 
         case NODE_CALL:
-                //node_navigator = node->call_expr.arguments;
+                fprintf(*fptr, "%s", idents);
 
-                //fprintf(*fptr, "%s%s( ", idents, node->call_expr.op)
+                navigate_node(node->call_expr.op, 0, fptr);
+                
+                fprintf(*fptr, "(");
+
+                node_navigator = node->call_expr.arguments;
+
+                while (node_navigator != NULL) {
+                    if (node_navigator != node->call_expr.arguments){
+                        fprintf(*fptr, ", ");
+                    }
+
+                    navigate_node(node_navigator, 0, fptr);
+                    
+                    node_navigator = node_navigator->next;
+                }
+
+                fprintf(*fptr, ")");
                 break;
 
         case NODE_LAMBDA:
