@@ -40,7 +40,7 @@ char* navigate_node(ASTNode* node, int identation_level, FILE** fptr){
         case NODE_IF:
             fprintf(*fptr, "%sif ", idents);
             navigate_node(node->if_stmt.condition, 0, fptr);
-            fprintf(*fptr, ":\n");
+            fprintf(*fptr, ":\n%s", idents);
 
             navigate_node(node->if_stmt.then_branch, identation_level+1, fptr);
 
