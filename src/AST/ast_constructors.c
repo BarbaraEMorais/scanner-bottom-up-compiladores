@@ -209,3 +209,15 @@ ASTNode *append_node(ASTNode *head, ASTNode *new_node) {
 
     return head;
 }
+
+ASTNode *create_top_level() {
+
+    ASTNode *node = (ASTNode *)malloc(sizeof(ASTNode));
+    if (!node) 
+        return NULL;
+
+    node->type = NODE_PROGRAM;
+    node->next = NULL;
+
+    return node;
+}

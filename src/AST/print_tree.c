@@ -113,6 +113,15 @@ void print_ast(ASTNode *node, int level) {
             print_ast(node->let_expr.body, level + 2);
             break;
 
+        case NODE_PROGRAM:
+            printf("Program: ");
+            ASTNode* sub_nodes = node->next;
+
+            while (sub_nodes != NULL) {
+                print_ast(sub_nodes, level+1);
+                sub_nodes = sub_nodes->next;
+            }
+            break;
         default:   
             printf("Unknown node type: %d\n", node->type);
             break;

@@ -70,6 +70,10 @@ typedef struct ASTNode {
             struct ASTNode *op;  
             struct ASTNode *arguments; 
         } call_expr;
+
+        struct {
+            struct ASTNode* nodes;
+        } top_level_expr;
     };
 
 } ASTNode;
@@ -87,6 +91,7 @@ ASTNode *create_call(ASTNode *op, ASTNode *arguments);
 ASTNode *create_lambda(ASTNode *params, ASTNode *body);
 ASTNode *create_let(int is_rec, ASTNode *bindings, ASTNode *body);
 ASTNode *append_node(ASTNode *head, ASTNode *new_node);
+ASTNode *create_top_level();
 
 ASTNode *create_binary_operation(
     char op,

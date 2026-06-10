@@ -28,6 +28,17 @@ char* navigate_node(ASTNode* node, int identation_level, FILE** fptr){
     ASTNode* node_navigator = NULL;
 
     switch (node->type) {
+        case NODE_PROGRAM:
+            node_navigator = node->next;
+
+            while(node_navigator != NULL){
+                navigate_node(node_navigator, identation_level, fptr);
+                node_navigator = node_navigator->next;
+                fprintf(*fptr, "\n");
+            }
+
+            break;
+
         case NODE_NUMBER:
             fprintf(*fptr, "%s%d", idents, node->number);
             break;
@@ -40,9 +51,41 @@ char* navigate_node(ASTNode* node, int identation_level, FILE** fptr){
             navigate_node(node->binary.right, 0, fptr);
             break;
         case NODE_DEFINE:
-            fprintf(*fptr, "%s%s = ", idents, node->define_stmt.name);
-            navigate_node(node->define_stmt.value, 0, fptr);
-            fprintf(*fptr, "%s\n", idents);
+            if (node->define_stmt.value->type != NODE_LAMBDA){
+                fprintf(*fptr, "%s%s = ", idents, node->define_stmt.name);
+                navigate_node(node->define_stmt.value, 0, fptr);
+                fprintf(*fptr, "%s\n", idents);
+            }
+            
+            else{
+                fprintf(*fptr, "%sdef %s( ", idents, node->define_stmt.name);
+                
+                node_navigator = node->define_stmt.value->lambda_expr.params;
+
+                while (node_navigator != NULL) {
+                    if (node_navigator != node->define_stmt.value->lambda_expr.params){
+                        fprintf(*fptr, ", ");
+                    }
+
+                    navigate_node(node_navigator, 0, fptr);
+                    
+                    node_navigator = node_navigator->next;
+                }
+
+                fprintf(*fptr, " ):\n");
+
+                node_navigator = node->define_stmt.value->lambda_expr.body;
+                while (node_navigator-> next != NULL) {
+                    navigate_node(node_navigator, identation_level+1, fptr);
+                    fprintf(*fptr, "\n");
+                }
+
+                fprintf(*fptr, "%s\treturn ", idents);
+                navigate_node(node_navigator, 0, fptr);
+
+                fprintf(*fptr, "\n");
+            }
+
             break;
         case NODE_IF:
             fprintf(*fptr, "%sif ", idents);
@@ -71,6 +114,10 @@ char* navigate_node(ASTNode* node, int identation_level, FILE** fptr){
             break;
         case NODE_STRING:
                 fprintf(*fptr, "%s", node->string_value);
+                break;
+        
+        case NODE_DECIMAL:
+                fprintf(*fptr, "%f", node->decimal);
                 break;
 
         case NODE_SET:

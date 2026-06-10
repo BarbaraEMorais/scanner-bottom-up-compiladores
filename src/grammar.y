@@ -78,7 +78,7 @@ ASTNode     *ast_root = NULL;
 
 program
     : top_level_list
-        { ast_root = $1; $$ = $1; }
+        { $$ = create_top_level(); append_node($$, $1); ast_root = $$; }
     | program error '\n'
         { yyerrok; $$ = $1; }
     /* CORRIGIDO: <<EOF>> é sintaxe inválida no Bison — removido.
