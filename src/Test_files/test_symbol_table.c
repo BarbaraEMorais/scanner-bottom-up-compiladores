@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "symbol_table.h" 
+#include "../symbol_table.h" 
 
 void testar_busca(SymbolTable *tabela, char *nome) {
    

@@ -3,7 +3,22 @@
 #include "grammar.tab.h"
 #include <stdio.h>
 #include <string.h>
+
+#define YY_USER_ACTION \
+    yylloc.first_line = yylloc.last_line; \
+    yylloc.first_column = yylloc.last_column; \
+    for(int i = 0; yytext[i] != '\0'; i++) { \
+        if(yytext[i] == '\n') { \
+            yylloc.last_line++; \
+            yylloc.last_column = 0; \
+        } \
+        else { \
+            yylloc.last_column++; \
+        } \
+    }
+
 %}
+
 
 %option noyywrap
 %option noinput
@@ -84,6 +99,8 @@ set             {printf("Flex: found  %s", yytext); return TOK_SET;}
                             return TOK_INTEGER;}
 
 [ \t\n\r]+    { /* Pula newline, tabs e novas linhas de forma segura */ }
-.               {fprintf(stderr, "Flex no token matches %s\n", yytext); return TOK_UNINDENTIFIED_TOKEN;}
-
+.               {
+                    extern int yynerrs;
+                    fprintf(stderr, "LEXICAL ERROR(Line: %d, Column %d): no token matches %s\n", yylloc.last_line, yylloc.last_column, yytext); 
+                    yynerrs++;}
 %%

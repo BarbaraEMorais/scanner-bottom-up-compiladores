@@ -1,9 +1,9 @@
 compile: flex.yy.c
-	gcc *.c -o main
+	gcc -g -Wall -Wextra *.c AST/*.c -o main
 flex.yy.c: bison
-	flex --bison-bridge --bison-locations *.l 
+	flex  *.l 
 bison:
-	bison -H --locations *.y
+	bison -H --locations -t *.y
 
 clean:
 	rm -f lex.yy.c main *.o

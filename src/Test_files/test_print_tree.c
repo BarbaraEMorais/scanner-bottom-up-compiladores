@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "ast.h"
+#include "../AST/ast.h"
 
 void test_number() {
     ASTNode *node = create_number(42);
