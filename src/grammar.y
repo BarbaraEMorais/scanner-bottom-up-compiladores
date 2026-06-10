@@ -4,6 +4,7 @@
 #include <string.h>
 #include "symbol_table.h"
 #include "errors.h"
+#include "AST/ast.h"
 
 #define YYDEBUG 1
 
@@ -18,16 +19,18 @@ Error* error_list = NULL;
 void yyerror(const char *s);
 
 SymbolTable *table;
+ASTNode *ast_root = NULL;
 
 %}
 
-%define parse.error verbose
+%define parse.error "verbose"
 
 /* ─── Tipos de valor dos tokens ─────────────────────────────────────────── */
 %union {
     int    ival;   /* TOK_INTEGER                  */
     double dval;   /* TOK_DECIMAL                  */
     char  *sval;   /* TOK_IDENTIFIER, TOK_STRING   */
+    ASTNode *node; /* para regras que constroem nós da AST */
 }
 
 /* ─── Tokens sem valor — espelhados exatamente do .l ────────────────────── */
@@ -86,8 +89,10 @@ SymbolTable *table;
 %token <sval> TOK_STRING
 
 /* ─── Tipos das regras (descomentar quando Bárbara adicionar AST) ────────── */
-/* %type <node> program top_level_expr define_expr expr atom list_expr */
-/* %type <node> lambda_expr if_expr cond_expr let_expr begin_expr set_expr call_expr */
+
+%type <node> program top_level_list top_level_expr define_expr expr atom list_expr
+%type <node> number negative_number body param_list lambda_expr if_expr let_expr
+%type <node> binding_list binding begin_expr set_expr call_expr expr_in_list expr_in_list_item expr_list
 
 /* ─── Precedência para resolver ambiguidade do sinal negativo ────────────
    TOK_UMINUS é um token fictício de alta precedência.
@@ -104,23 +109,25 @@ SymbolTable *table;
 
 program
     : top_level_list
-        { printf("[parser] programa completo\n"); }
+        { ast_root = $1; }
     | program error '\n' {yyerrok; }
     | program error <<EOF>> {yyerrok; }
     ;
 
 top_level_list
     : top_level_expr
+        { $$ = $1;}
     | top_level_list top_level_expr
+        { $$ = append_node($1, $2); }
     ;
 
 top_level_expr
     : define_expr
-        { printf("[parser] top-level: define\n"); }
+        { $$ = $1; }
     | expr
-        { printf("[parser] top-level: expressao\n"); }
+        { $$ = $1; }
     | comment
-        { printf("[parser] top-level: comentario ignorado\n"); }
+        { $$ = NULL; }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -156,6 +163,7 @@ define_expr
         {
             printf("[parser] define variavel: '%s'\n", $3);
             insert_symbol(table, $3, TYPE_NUMBER);
+            $$ = create_define($3, $4);
         }
 
     /* Bug fix: enter_scope antes dos params para que sejam visíveis no corpo — parte integrada com symbol_table.h */
@@ -164,6 +172,9 @@ define_expr
             printf("[parser] define funcao: '%s'\n", $4);
             insert_symbol(table, $4, TYPE_FUNCTION);
             exit_scope(table);
+
+            ASTNode *lambda = create_lambda($6, $8);
+            $$ = create_define($4, lambda);
         }
     ;
 
@@ -174,10 +185,14 @@ define_expr
 
 param_list
     : /* vazio — (define (f) ...) */
+        { $$ = NULL; }
     | param_list TOK_IDENTIFIER
         {
             printf("[parser] parametro: '%s'\n", $2);
-            insert_symbol(table, $2, TYPE_NUMBER); /* parte integrada com symbol_table.h */
+            insert_symbol(table, $2, TYPE_NUMBER); 
+            
+            ASTNode *p_node = create_identifier($2);
+            $$ = append_node($1, p_node);
         }
     ;
 
@@ -188,7 +203,9 @@ param_list
 
 body
     : expr
+        { $$ = $1; }
     | body expr
+        {$$ = append_node($1, $2);}
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -196,8 +213,8 @@ body
    ════════════════════════════════════════════════════════════════════════════ */
 
 expr
-    : atom
-    | list_expr
+    : atom { $$ = $1; }
+    | list_expr { $$ = $1; }
     ;
 
 /* ─── Número com sinal opcional ──────────────────────────────────────────
@@ -207,9 +224,16 @@ expr
 
 number
     : TOK_INTEGER
-        { printf("[parser] numero inteiro: %d\n", $1); }
+        {
+            printf("[parser] numero inteiro: %d\n", $1); 
+            $$ = create_number($1);
+        }
+        
     | TOK_DECIMAL
-        { printf("[parser] numero decimal: %f\n", $1); }
+        { 
+            printf("[parser] numero decimal: %f\n", $1); 
+            $$ = create_decimal($1);
+        }
     ;
 
 /* ─── Número negativo — só válido como átomo isolado ─────────────────────
@@ -219,18 +243,20 @@ number
 
 negative_number
     : TOK_MINUS TOK_INTEGER %prec TOK_UMINUS
-        { printf("[parser] numero inteiro negativo: -%d\n", $2); }
+        { printf("[parser] numero inteiro negativo: -%d\n", $2); 
+        $$ = create_number(-$2);}
     | TOK_MINUS TOK_DECIMAL %prec TOK_UMINUS
-        { printf("[parser] numero decimal negativo: -%f\n", $2); }
+        { printf("[parser] numero decimal negativo: -%f\n", $2); 
+        $$ = create_decimal(-$2);}
     ;
 
 /* ─── Átomos ─────────────────────────────────────────────────────────────── */
 
 atom
-    : number
-    | negative_number
+    : number { $$ = $1; }
+    | negative_number { $$ = $1; }
     | TOK_STRING
-        { printf("[parser] atom string: %s\n", $1); }
+        { printf("[parser] atom string: %s\n", $1); $$ = create_string($1);}
     | TOK_IDENTIFIER
         {
             printf("[parser] atom identificador: '%s'\n", $1);
@@ -241,41 +267,44 @@ atom
                 yyerror("[Erro Semantico]: Variável não declarada");
                 //fprintf(stderr, "[Erro Semantico] Linha %d: Variavel '%s' nao declarada.\n", yylineno, $1);
             }
+            $$ = create_identifier($1);
         }
     | TOK_TRUE
-        { printf("[parser] atom: #t\n"); }
+        { $$ = create_boolean(1);}
     | TOK_FALSE
-        { printf("[parser] atom: #f\n"); }
+        { $$ = create_boolean(0); }
     /* Operadores como átomos — necessário para (+ a b), (* x y), etc.
        TOK_MINUS removido daqui — tratado em negative_number para evitar
        conflito shift/reduce com "-456".                               */
     | TOK_PLUS
-        { printf("[parser] atom operador: +\n"); }
+        { $$ = create_identifier("+"); }
+    | TOK_MINUS
+        { $$ = create_identifier("-"); }
     | TOK_MULT
-        { printf("[parser] atom operador: *\n"); }
+        { $$ = create_identifier("*"); }
     | TOK_DIVIDE
-        { printf("[parser] atom operador: /\n"); }
+        { $$ = create_identifier("/"); }
     | TOK_EQUAL
-        { printf("[parser] atom operador: =\n"); }
+        { $$ = create_identifier("="); }
     | TOK_LEFT_ARROW
-        { printf("[parser] atom operador: <\n"); }
+        { $$ = create_identifier("<"); }
     | TOK_RIGHT_ARROW
-        { printf("[parser] atom operador: >\n"); }
+        { $$ = create_identifier(">"); }
     ;
 
 /* ─── Listas / Formas especiais ──────────────────────────────────────────── */
 /* ATENÇÃO: call_expr deve vir por último — é o caso genérico */
 
 list_expr
-    : lambda_expr
-    | if_expr
-    | cond_expr
-    | let_expr
-    | begin_expr
-    | set_expr
-    | when_expr
-    | and_or_expr
-    | call_expr
+    : lambda_expr { $$ = $1; }
+    | if_expr { $$ = $1; }
+    | cond_expr { $$ = NULL; }
+    | let_expr { $$ = $1; }
+    | begin_expr { $$ = $1; }
+    | set_expr { $$ = $1; }
+    | when_expr { $$ = NULL; }
+    | and_or_expr { $$ = NULL; }
+    | call_expr { $$ = $1; }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -285,7 +314,7 @@ list_expr
 
 lambda_expr
     : TOK_LPAREN TOK_LAMBDA TOK_LPAREN param_list TOK_RPAREN body TOK_RPAREN
-        { printf("[parser] lambda\n"); }
+        { $$ = create_lambda($4, $6); }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -296,9 +325,9 @@ lambda_expr
 
 if_expr
     : TOK_LPAREN TOK_IF expr expr TOK_RPAREN
-        { printf("[parser] if sem else\n"); }
+        { $$ = create_if($3, $4, NULL); }
     | TOK_LPAREN TOK_IF expr expr expr TOK_RPAREN
-        { printf("[parser] if-else\n"); }
+        {$$ = create_if($3, $4, $5); }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -308,7 +337,6 @@ if_expr
 
 cond_expr
     : TOK_LPAREN TOK_COND cond_clause_list TOK_RPAREN
-        { printf("[parser] cond\n"); }
     ;
 
 cond_clause_list
@@ -334,25 +362,29 @@ let_expr
         {
             printf("[parser] let\n");
             exit_scope(table);
+            $$ = create_let(0, $5, $7);
         }
     /* Bug fix: letrec também precisa de enter_scope — parte integrada com symbol_table.h */
     | TOK_LPAREN TOK_LETREC { enter_scope(table); } TOK_LPAREN binding_list TOK_RPAREN body TOK_RPAREN
         {
             printf("[parser] letrec\n");
             exit_scope(table);
+            $$ = create_let(1, $5, $7);
         }
     ;
 
 binding_list
-    : /* vazio */
+    : /* vazio */ { $$ = NULL; }
     | binding_list binding
+        {$$ = append_node($1, $2);}
     ;
 
 binding
     : TOK_LPAREN TOK_IDENTIFIER expr TOK_RPAREN
         {
             printf("[parser] binding: '%s'\n", $2);
-            insert_symbol(table, $2, TYPE_NUMBER); /* parte integrada com symbol_table.h */
+            insert_symbol(table, $2, TYPE_NUMBER); 
+            $$ = create_define($2, $3);
         }
     ;
 
@@ -363,7 +395,7 @@ binding
 
 begin_expr
     : TOK_LPAREN TOK_BEGIN expr_list TOK_RPAREN
-        { printf("[parser] begin\n"); }
+        { $$ = create_begin($3); }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -373,7 +405,7 @@ begin_expr
 
 set_expr
     : TOK_LPAREN TOK_SET TOK_IDENTIFIER expr TOK_RPAREN
-        { printf("[parser] set!: '%s'\n", $3); }
+        { $$ = create_set($3, $4); }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -406,7 +438,7 @@ and_or_expr
 
 call_expr
     : TOK_LPAREN expr_in_list_item expr_in_list TOK_RPAREN
-        { printf("[parser] call\n"); }
+        { $$ = create_call($2, $3); }
     ;
 
 /* ─── Lista de expressões dentro de parênteses (zero ou mais) ───────────────
@@ -414,14 +446,15 @@ call_expr
    dentro de listas, nunca sinal de número negativo.                        */
 
 expr_in_list
-    : /* vazio */
+    : /* vazio */ { $$ = NULL; }
     | expr_in_list expr_in_list_item
+        {$$ = append_node($1, $2);}
     ;
 
 expr_in_list_item
-    : number
+    : number { $$ = $1; }
     | TOK_STRING
-        { printf("[parser] atom string: %s\n", $1); }
+        { { $$ = create_string($1); } }
     | TOK_IDENTIFIER
                 {
             printf("[parser] atom identificador: '%s'\n", $1);
@@ -432,34 +465,35 @@ expr_in_list_item
                 yyerror("[Erro Semantico]: Variável não declarada");
                 //fprintf(stderr, "[Erro Semantico] Linha %d: Variavel '%s' nao declarada.\n", yylineno, $1);
             }
+            $$ = create_identifier($1);
         }
     | TOK_TRUE
-        { printf("[parser] atom: #t\n"); }
+        { $$ = create_boolean(1); }
     | TOK_FALSE
-        { printf("[parser] atom: #f\n"); }
+        { $$ = create_boolean(0); }
     | TOK_PLUS
-        { printf("[parser] atom operador: +\n"); }
+        { $$ = create_identifier("+"); }
     | TOK_MINUS
-        { printf("[parser] atom operador: -\n"); }
+        { $$ = create_identifier("-"); }
     | TOK_MULT
-        { printf("[parser] atom operador: *\n"); }
+        { $$ = create_identifier("*"); }
     | TOK_DIVIDE
-        { printf("[parser] atom operador: /\n"); }
+        { $$ = create_identifier("/"); }
     | TOK_EQUAL
-        { printf("[parser] atom operador: =\n"); }
+        { $$ = create_identifier("="); }
     | TOK_LEFT_ARROW
-        { printf("[parser] atom operador: <\n"); }
+        { $$ = create_identifier("<"); }
     | TOK_RIGHT_ARROW
-        { printf("[parser] atom operador: >\n"); }
-    | list_expr
-    | error TOK_RPAREN {yyerrok;}
+        { $$ = create_identifier(">"); }
+    | list_expr { $$ = $1; }
+    | error TOK_RPAREN {yyerrok; $$ = NULL;}
     ;
 
 /* ─── Lista de expressões (zero ou mais) ─────────────────────────────────── */
 
 expr_list
-    : /* vazio */
-    | expr_list expr
+    : /* vazio */ { $$ = NULL; }
+    | expr_list expr {$$ = append_node($1, $2);}
     ;
 
 
@@ -481,13 +515,19 @@ int main(void) {
     table = create_symbol_table(); /* parte integrada com symbol_table.h */
 
     int result = yyparse();
-    if (result == 0)
-        printf("=== Parsing concluido com sucesso ===\n");
-    else
+    if (result == 0) {
+        printf("\n=== ARVORE SINTATICA ABSTRATA (AST) GERADA ===\n");
+        if (ast_root != NULL) {
+            print_ast(ast_root, 0); /* Executa o print recursivo da árvore */
+        } else {
+            printf("[Aviso] Árvore vazia.\n");
+        }
+        printf("==============================================\n");
+    } else {
         printf("=== Parsing falhou ===\n");
+    }
 
-    free(table); /* parte integrada com symbol_table.h */
-
-        printf("Número de erros: %d", yynerrs);
+    free(table);
+    printf("Número de erros: %d\n", yynerrs);
     return result;
 }
