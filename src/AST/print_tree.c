@@ -68,7 +68,7 @@ void print_ast(ASTNode *node, int level) {
             printf("Function Call\n");
             for (int i = 0; i < level + 1; i++) printf("  ");
             printf("Operator:\n");
-            print_ast(node->call_expr.operator, level + 2);
+            print_ast(node->call_expr.op, level + 2);
             
             if (node->call_expr.arguments) {
                 for (int i = 0; i < level + 1; i++) printf("  ");

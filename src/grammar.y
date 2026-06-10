@@ -13,8 +13,6 @@ extern char *yytext;
 
 int num_errors = 0;
 
-Error* error_list = NULL;
-
 void yyerror(const char *s);
 
 SymbolTable *table;
@@ -27,6 +25,11 @@ ASTNode     *ast_root = NULL;
 %define parse.error verbose
 
 /* ─── União de tipos ─────────────────────────────────────── */
+%code requires
+{
+  #include "AST/ast.h"
+}
+
 %union {
     int      ival;
     double   dval;
@@ -177,7 +180,7 @@ number
     | TOK_DECIMAL
         { 
             printf("[parser] numero decimal: %f\n", $1); 
-            $$ = create_float($1);
+            $$ = create_decimal($1);
         }
     ;
 
@@ -186,7 +189,7 @@ negative_number
         { printf("[parser] inteiro negativo: -%d\n", $2); $$ = create_number(-$2); }
     | TOK_MINUS TOK_DECIMAL %prec TOK_UMINUS
         { printf("[parser] numero decimal negativo: -%f\n", $2); 
-        $$ = create_float(-$2);}
+        $$ = create_decimal(-$2);}
     ;
 
 atom
