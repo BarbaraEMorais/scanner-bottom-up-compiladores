@@ -35,9 +35,9 @@ ASTNode *create_decimal(double value) {
     if (!node) 
         return NULL;
 
-    node->type = NODE_FLOAT;
+    node->type = NODE_DECIMAL;
     node->next = NULL;
-    node->float_value = value;
+    node->decimal = value;
 
     return node;
 }

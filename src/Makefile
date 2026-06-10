@@ -11,5 +11,5 @@ clean:
 test-compile:
 	bison -d grammar.y 
 	flex tokenizer.l  
-	gcc -Wall -o compiler grammar.tab.c lex.yy.c symbol_table.c
+	gcc -Wall -o compiler grammar.tab.c lex.yy.c symbol_table.c AST/print_tree.c AST/ast_constructors.c
 	./compiler < teste.scm  
