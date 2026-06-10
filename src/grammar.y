@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "symbol_table.h"
+#include "AST/ast.h"
 
 extern int  yylex(void);
 extern int  yylineno;
@@ -14,14 +15,14 @@ SymbolTable *table;
 
 %}
 
-/* ─── Tipos de valor dos tokens ─────────────────────────────────────────── */
 %union {
-    int    ival;   /* TOK_INTEGER                  */
-    double dval;   /* TOK_DECIMAL                  */
-    char  *sval;   /* TOK_IDENTIFIER, TOK_STRING   */
+    int      ival;
+    double   dval;
+    char    *sval;
+    ASTNode *node;
+    char     cval;
 }
 
-/* ─── Tokens sem valor — espelhados exatamente do .l ────────────────────── */
 %token TOK_LPAREN
 %token TOK_RPAREN
 %token TOK_COMMA
@@ -35,18 +36,15 @@ SymbolTable *table;
 %token TOK_RIGHT_ARROW
 %token TOK_UNINDENTIFIED_TOKEN
 
-/* Operadores */
 %token TOK_PLUS
 %token TOK_MINUS
 %token TOK_MULT
 %token TOK_DIVIDE
 %token TOK_EQUAL
 
-/* Booleanos */
 %token TOK_TRUE
 %token TOK_FALSE
 
-/* Palavras-chave */
 %token TOK_DEFINE
 %token TOK_LAMBDA
 %token TOK_IF
@@ -70,28 +68,21 @@ SymbolTable *table;
 %token TOK_ONLY
 %token TOK_EXCEPT
 
-/* ─── Tokens com valor ───────────────────────────────────────────────────── */
 %token <ival> TOK_INTEGER
 %token <dval> TOK_DECIMAL
 %token <sval> TOK_IDENTIFIER
 %token <sval> TOK_STRING
 
-/* ─── Tipos das regras (descomentar quando Bárbara adicionar AST) ────────── */
-/* %type <node> program top_level_expr define_expr expr atom list_expr */
-/* %type <node> lambda_expr if_expr cond_expr let_expr begin_expr set_expr call_expr */
+/* ─── Regras com nó AST — parte integrada com ast.h ─────────────────────── */
+%type <node> expr atom number negative_number define_expr if_expr call_expr
+%type <node> expr_in_list_item top_level_expr
 
-/* ─── Precedência para resolver ambiguidade do sinal negativo ────────────
-   TOK_UMINUS é um token fictício de alta precedência.
-   Marca as regras de negative_number para que o Bison prefira shift
-   (juntar - com número) em vez de reduce (tratar - como operador átomo). */
+/* ─── Regras sem nó AST ainda ───────────────────────────────────────────── */
+%type <node> list_expr lambda_expr cond_expr let_expr begin_expr set_expr when_expr and_or_expr
+
 %right TOK_UMINUS
 
 %%
-
-/* ════════════════════════════════════════════════════════════════════════════
-   PROGRAMA
-   Sequência de expressões de nível superior.
-   ════════════════════════════════════════════════════════════════════════════ */
 
 program
     : top_level_list
@@ -103,19 +94,26 @@ top_level_list
     | top_level_list top_level_expr
     ;
 
+/* parte integrada com ast.h — imprime árvore do nó raiz */
 top_level_expr
     : define_expr
-        { printf("[parser] top-level: define\n"); }
+        {
+            printf("[parser] top-level: define\n");
+            if ($1) print_ast($1, 0);
+            $$ = $1;
+        }
     | expr
-        { printf("[parser] top-level: expressao\n"); }
+        {
+            printf("[parser] top-level: expressao\n");
+            if ($1) print_ast($1, 0);
+            $$ = $1;
+        }
     | comment
-        { printf("[parser] top-level: comentario ignorado\n"); }
+        {
+            printf("[parser] top-level: comentario ignorado\n");
+            $$ = NULL;
+        }
     ;
-
-/* ════════════════════════════════════════════════════════════════════════════
-   COMENTÁRIOS MULTILINE
-   #| qualquer coisa |#  — ignorado semanticamente
-   ════════════════════════════════════════════════════════════════════════════ */
 
 comment
     : TOK_MULTILINE_COMMENT_START token_seq TOK_MULTILINE_COMMENT_END
@@ -135,168 +133,174 @@ any_token
 
 /* ════════════════════════════════════════════════════════════════════════════
    DEFINE
-   (define <id> <expr>)              → variável
-   (define (<id> <params>) <body>)   → função
+   (define x expr)        → NODE_DEFINE   — parte integrada com ast.h
+   (define (f params) body) → sem nó ainda
    ════════════════════════════════════════════════════════════════════════════ */
 
 define_expr
-    /* Bug fix: inserir variavel na tabela ao definir — parte integrada com symbol_table.h */
     : TOK_LPAREN TOK_DEFINE TOK_IDENTIFIER expr TOK_RPAREN
         {
             printf("[parser] define variavel: '%s'\n", $3);
             insert_symbol(table, $3, TYPE_NUMBER);
+            $$ = create_define($3, $4); /* parte integrada com ast.h */
         }
-
-    /* Bug fix: enter_scope antes dos params para que sejam visíveis no corpo — parte integrada com symbol_table.h */
     | TOK_LPAREN TOK_DEFINE TOK_LPAREN TOK_IDENTIFIER { enter_scope(table); } param_list TOK_RPAREN body TOK_RPAREN
         {
             printf("[parser] define funcao: '%s'\n", $4);
             insert_symbol(table, $4, TYPE_FUNCTION);
             exit_scope(table);
+            $$ = NULL; /* NODE_DEFINE para função — sem nó AST ainda */
         }
     ;
 
-/* ════════════════════════════════════════════════════════════════════════════
-   PARÂMETROS
-   Lista de identificadores: (define (f x y z) ...)
-   ════════════════════════════════════════════════════════════════════════════ */
-
 param_list
-    : /* vazio — (define (f) ...) */
+    : /* vazio */
     | param_list TOK_IDENTIFIER
         {
             printf("[parser] parametro: '%s'\n", $2);
-            insert_symbol(table, $2, TYPE_NUMBER); /* parte integrada com symbol_table.h */
+            insert_symbol(table, $2, TYPE_NUMBER);
         }
     ;
-
-/* ════════════════════════════════════════════════════════════════════════════
-   CORPO
-   Uma ou mais expressões.
-   ════════════════════════════════════════════════════════════════════════════ */
 
 body
     : expr
     | body expr
     ;
 
-/* ════════════════════════════════════════════════════════════════════════════
-   EXPRESSÃO
-   ════════════════════════════════════════════════════════════════════════════ */
-
 expr
-    : atom
-    | list_expr
+    : atom      { $$ = $1; }
+    | list_expr { $$ = $1; }
     ;
 
-/* ─── Número com sinal opcional ──────────────────────────────────────────
-   Trata: 123, 3.14
-   O sinal negativo vem como TOK_MINUS separado do Flex, então precisamos
-   de uma regra explícita para unificá-los num único valor numérico.        */
+/* ════════════════════════════════════════════════════════════════════════════
+   NUMBER — NODE_NUMBER — parte integrada com ast.h
+   ════════════════════════════════════════════════════════════════════════════ */
 
 number
     : TOK_INTEGER
-        { printf("[parser] numero inteiro: %d\n", $1); }
+        {
+            printf("[parser] numero inteiro: %d\n", $1);
+            $$ = create_number($1);
+        }
     | TOK_DECIMAL
-        { printf("[parser] numero decimal: %f\n", $1); }
+        {
+            printf("[parser] numero decimal: %f\n", $1);
+            $$ = create_number((int)$1);
+        }
     ;
 
-/* ─── Número negativo — só válido como átomo isolado ─────────────────────
-   (- 123 456) → o TOK_MINUS é operador em call_expr, NÃO entra aqui
-   -456 sozinho → TOK_MINUS + TOK_INTEGER reduz para negative_number
-   A separação evita que (- 123 456) consuma o - junto com o 123.        */
+/* ════════════════════════════════════════════════════════════════════════════
+   NEGATIVE NUMBER — NODE_NUMBER com valor negativo — parte integrada com ast.h
+   ════════════════════════════════════════════════════════════════════════════ */
 
 negative_number
     : TOK_MINUS TOK_INTEGER %prec TOK_UMINUS
-        { printf("[parser] numero inteiro negativo: -%d\n", $2); }
+        {
+            printf("[parser] numero inteiro negativo: -%d\n", $2);
+            $$ = create_number(-$2);
+        }
     | TOK_MINUS TOK_DECIMAL %prec TOK_UMINUS
-        { printf("[parser] numero decimal negativo: -%f\n", $2); }
+        {
+            printf("[parser] numero decimal negativo: -%f\n", $2);
+            $$ = create_number(-(int)$2);
+        }
     ;
 
-/* ─── Átomos ─────────────────────────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════════════════════════
+   ATOM
+   number/negative_number → NODE_NUMBER        — parte integrada com ast.h
+   identifier             → NODE_IDENTIFIER    — parte integrada com ast.h
+   #t / #f                → NODE_NUMBER (1/0)  — parte integrada com ast.h
+   demais                 → NULL
+   ════════════════════════════════════════════════════════════════════════════ */
 
 atom
-    : number
-    | negative_number
+    : number         { $$ = $1; }
+    | negative_number { $$ = $1; }
     | TOK_STRING
-        { printf("[parser] atom string: %s\n", $1); }
+        {
+            printf("[parser] atom string: %s\n", $1);
+            $$ = NULL;
+        }
     | TOK_IDENTIFIER
         {
-            printf("[parser] atom identificador: '%s'\n", $1);
-            /* parte integrada com symbol_table.h */
             Symbol *s = search_symbol(table, $1);
             if (s == NULL) {
                 fprintf(stderr, "[Erro Semantico] Linha %d: Variavel '%s' nao declarada.\n", yylineno, $1);
                 exit(1);
             }
+            printf("[parser] atom identificador: '%s'\n", $1);
+            $$ = create_identifier($1); /* parte integrada com ast.h */
         }
     | TOK_TRUE
-        { printf("[parser] atom: #t\n"); }
+        {
+            printf("[parser] atom: #t\n");
+            $$ = create_number(1); /* parte integrada com ast.h */
+        }
     | TOK_FALSE
-        { printf("[parser] atom: #f\n"); }
-    /* Operadores como átomos — necessário para (+ a b), (* x y), etc.
-       TOK_MINUS removido daqui — tratado em negative_number para evitar
-       conflito shift/reduce com "-456".                               */
-    | TOK_PLUS
-        { printf("[parser] atom operador: +\n"); }
-    | TOK_MULT
-        { printf("[parser] atom operador: *\n"); }
-    | TOK_DIVIDE
-        { printf("[parser] atom operador: /\n"); }
-    | TOK_EQUAL
-        { printf("[parser] atom operador: =\n"); }
-    | TOK_LEFT_ARROW
-        { printf("[parser] atom operador: <\n"); }
-    | TOK_RIGHT_ARROW
-        { printf("[parser] atom operador: >\n"); }
+        {
+            printf("[parser] atom: #f\n");
+            $$ = create_number(0); /* parte integrada com ast.h */
+        }
+    | TOK_PLUS   { printf("[parser] atom operador: +\n"); $$ = NULL; }
+    | TOK_MULT   { printf("[parser] atom operador: *\n"); $$ = NULL; }
+    | TOK_DIVIDE { printf("[parser] atom operador: /\n"); $$ = NULL; }
+    | TOK_EQUAL  { printf("[parser] atom operador: =\n"); $$ = NULL; }
+    | TOK_LEFT_ARROW  { printf("[parser] atom operador: <\n"); $$ = NULL; }
+    | TOK_RIGHT_ARROW { printf("[parser] atom operador: >\n"); $$ = NULL; }
     ;
 
-/* ─── Listas / Formas especiais ──────────────────────────────────────────── */
-/* ATENÇÃO: call_expr deve vir por último — é o caso genérico */
-
 list_expr
-    : lambda_expr
-    | if_expr
-    | cond_expr
-    | let_expr
-    | begin_expr
-    | set_expr
-    | when_expr
-    | and_or_expr
-    | call_expr
+    : lambda_expr { $$ = $1; }
+    | if_expr     { $$ = $1; }
+    | cond_expr   { $$ = $1; }
+    | let_expr    { $$ = $1; }
+    | begin_expr  { $$ = $1; }
+    | set_expr    { $$ = $1; }
+    | when_expr   { $$ = $1; }
+    | and_or_expr { $$ = $1; }
+    | call_expr   { $$ = $1; }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
-   LAMBDA
-   (lambda (params) body)
+   LAMBDA — sem nó AST ainda
    ════════════════════════════════════════════════════════════════════════════ */
 
 lambda_expr
     : TOK_LPAREN TOK_LAMBDA TOK_LPAREN param_list TOK_RPAREN body TOK_RPAREN
-        { printf("[parser] lambda\n"); }
+        {
+            printf("[parser] lambda\n");
+            $$ = NULL;
+        }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
-   IF
-   (if <cond> <then>)
-   (if <cond> <then> <else>)
+   IF — NODE_IF — parte integrada com ast.h
    ════════════════════════════════════════════════════════════════════════════ */
 
 if_expr
     : TOK_LPAREN TOK_IF expr expr TOK_RPAREN
-        { printf("[parser] if sem else\n"); }
+        {
+            printf("[parser] if sem else\n");
+            $$ = create_if($3, $4, NULL);
+        }
     | TOK_LPAREN TOK_IF expr expr expr TOK_RPAREN
-        { printf("[parser] if-else\n"); }
+        {
+            printf("[parser] if-else\n");
+            $$ = create_if($3, $4, $5);
+        }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
-   COND
-   (cond (<test> <expr>...) ... (else <expr>...))
+   COND — sem nó AST ainda
    ════════════════════════════════════════════════════════════════════════════ */
 
 cond_expr
     : TOK_LPAREN TOK_COND cond_clause_list TOK_RPAREN
-        { printf("[parser] cond\n"); }
+        {
+            printf("[parser] cond\n");
+            $$ = NULL;
+        }
     ;
 
 cond_clause_list
@@ -312,22 +316,21 @@ cond_clause
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
-   LET / LETREC
-   (let ((x 1) (y 2)) body)
+   LET / LETREC — sem nó AST ainda
    ════════════════════════════════════════════════════════════════════════════ */
 
 let_expr
-    /* Bug fix: enter_scope antes do binding_list — parte integrada com symbol_table.h */
     : TOK_LPAREN TOK_LET { enter_scope(table); } TOK_LPAREN binding_list TOK_RPAREN body TOK_RPAREN
         {
             printf("[parser] let\n");
             exit_scope(table);
+            $$ = NULL;
         }
-    /* Bug fix: letrec também precisa de enter_scope — parte integrada com symbol_table.h */
     | TOK_LPAREN TOK_LETREC { enter_scope(table); } TOK_LPAREN binding_list TOK_RPAREN body TOK_RPAREN
         {
             printf("[parser] letrec\n");
             exit_scope(table);
+            $$ = NULL;
         }
     ;
 
@@ -340,108 +343,136 @@ binding
     : TOK_LPAREN TOK_IDENTIFIER expr TOK_RPAREN
         {
             printf("[parser] binding: '%s'\n", $2);
-            insert_symbol(table, $2, TYPE_NUMBER); /* parte integrada com symbol_table.h */
+            insert_symbol(table, $2, TYPE_NUMBER);
         }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
-   BEGIN
-   (begin expr expr ...)
+   BEGIN — sem nó AST ainda
    ════════════════════════════════════════════════════════════════════════════ */
 
 begin_expr
     : TOK_LPAREN TOK_BEGIN expr_list TOK_RPAREN
-        { printf("[parser] begin\n"); }
+        {
+            printf("[parser] begin\n");
+            $$ = NULL;
+        }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
-   SET!
-   (set! <id> <expr>)
+   SET! — sem nó AST ainda
    ════════════════════════════════════════════════════════════════════════════ */
 
 set_expr
     : TOK_LPAREN TOK_SET TOK_IDENTIFIER expr TOK_RPAREN
-        { printf("[parser] set!: '%s'\n", $3); }
+        {
+            printf("[parser] set!: '%s'\n", $3);
+            $$ = NULL;
+        }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
-   WHEN
-   (when <cond> <body>)
+   WHEN — sem nó AST ainda
    ════════════════════════════════════════════════════════════════════════════ */
 
 when_expr
     : TOK_LPAREN TOK_WHEN expr body TOK_RPAREN
-        { printf("[parser] when\n"); }
+        {
+            printf("[parser] when\n");
+            $$ = NULL;
+        }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
-   AND / OR
-   (and expr...) / (or expr...)
+   AND / OR — sem nó AST ainda
    ════════════════════════════════════════════════════════════════════════════ */
 
 and_or_expr
     : TOK_LPAREN TOK_AND expr_list TOK_RPAREN
-        { printf("[parser] and\n"); }
+        {
+            printf("[parser] and\n");
+            $$ = NULL;
+        }
     | TOK_LPAREN TOK_OR expr_list TOK_RPAREN
-        { printf("[parser] or\n"); }
+        {
+            printf("[parser] or\n");
+            $$ = NULL;
+        }
     ;
 
 /* ════════════════════════════════════════════════════════════════════════════
-   CHAMADA DE FUNÇÃO GENÉRICA
-   (operador arg arg ...)
-   Cobre: (+ 1 2), (f x y), (display x), (< a b), etc.
+   CALL EXPR
+   (op a b) onde op é binário → NODE_BINARY_OP — parte integrada com ast.h
+   demais chamadas            → NULL por enquanto
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ════════════════════════════════════════════════════════════════════════════
+   CALL EXPR
+   Não usamos binary_op separado pois conflita com expr_in_list_item.
+   Em vez disso, call_expr usa sempre expr_in_list_item como operador.
+   O NODE_BINARY_OP é criado na semântica quando detectamos um operador
+   como primeiro elemento — via campo sval do token.
    ════════════════════════════════════════════════════════════════════════════ */
 
 call_expr
-    : TOK_LPAREN expr_in_list_item expr_in_list TOK_RPAREN
-        { printf("[parser] call\n"); }
+    : TOK_LPAREN TOK_PLUS expr_in_list_item expr_in_list_item TOK_RPAREN
+        { printf("[parser] call binario: +\n"); $$ = create_binary_operation('+', $3, $4); }
+    | TOK_LPAREN TOK_MINUS expr_in_list_item expr_in_list_item TOK_RPAREN
+        { printf("[parser] call binario: -\n"); $$ = create_binary_operation('-', $3, $4); }
+    | TOK_LPAREN TOK_MULT expr_in_list_item expr_in_list_item TOK_RPAREN
+        { printf("[parser] call binario: *\n"); $$ = create_binary_operation('*', $3, $4); }
+    | TOK_LPAREN TOK_DIVIDE expr_in_list_item expr_in_list_item TOK_RPAREN
+        { printf("[parser] call binario: /\n"); $$ = create_binary_operation('/', $3, $4); }
+    | TOK_LPAREN TOK_EQUAL expr_in_list_item expr_in_list_item TOK_RPAREN
+        { printf("[parser] call binario: =\n"); $$ = create_binary_operation('=', $3, $4); }
+    | TOK_LPAREN TOK_LEFT_ARROW expr_in_list_item expr_in_list_item TOK_RPAREN
+        { printf("[parser] call binario: <\n"); $$ = create_binary_operation('<', $3, $4); }
+    | TOK_LPAREN TOK_RIGHT_ARROW expr_in_list_item expr_in_list_item TOK_RPAREN
+        { printf("[parser] call binario: >\n"); $$ = create_binary_operation('>', $3, $4); }
+    | TOK_LPAREN expr_in_list_item expr_in_list TOK_RPAREN
+        { printf("[parser] call\n"); $$ = NULL; }
     ;
-
-/* ─── Lista de expressões dentro de parênteses (zero ou mais) ───────────────
-   Usa expr_in_list em vez de expr para que TOK_MINUS seja sempre operador
-   dentro de listas, nunca sinal de número negativo.                        */
 
 expr_in_list
     : /* vazio */
     | expr_in_list expr_in_list_item
     ;
 
+/* ════════════════════════════════════════════════════════════════════════════
+   EXPR_IN_LIST_ITEM
+   number      → NODE_NUMBER      — parte integrada com ast.h
+   identifier  → NODE_IDENTIFIER  — parte integrada com ast.h
+   #t/#f       → NODE_NUMBER(1/0) — parte integrada com ast.h
+   demais      → NULL
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── expr_in_list_item ─────────────────────────────────────────────────────
+   Operadores (TOK_PLUS, TOK_MINUS, etc.) foram removidos daqui para evitar
+   conflito shift/reduce com as alternativas binárias de call_expr.
+   Operadores agora só aparecem como primeiro token das alternativas
+   explícitas em call_expr.                                                  */
+
 expr_in_list_item
-    : number
+    : number { $$ = $1; }
     | TOK_STRING
-        { printf("[parser] atom string: %s\n", $1); }
+        {
+            printf("[parser] atom string: %s\n", $1);
+            $$ = NULL;
+        }
     | TOK_IDENTIFIER
-                {
-            printf("[parser] atom identificador: '%s'\n", $1);
-            /* parte integrada com symbol_table.h */
+        {
             Symbol *s = search_symbol(table, $1);
             if (s == NULL) {
                 fprintf(stderr, "[Erro Semantico] Linha %d: Variavel '%s' nao declarada.\n", yylineno, $1);
                 exit(1);
             }
+            printf("[parser] atom identificador: '%s'\n", $1);
+            $$ = create_identifier($1);
         }
-    | TOK_TRUE
-        { printf("[parser] atom: #t\n"); }
-    | TOK_FALSE
-        { printf("[parser] atom: #f\n"); }
-    | TOK_PLUS
-        { printf("[parser] atom operador: +\n"); }
-    | TOK_MINUS
-        { printf("[parser] atom operador: -\n"); }
-    | TOK_MULT
-        { printf("[parser] atom operador: *\n"); }
-    | TOK_DIVIDE
-        { printf("[parser] atom operador: /\n"); }
-    | TOK_EQUAL
-        { printf("[parser] atom operador: =\n"); }
-    | TOK_LEFT_ARROW
-        { printf("[parser] atom operador: <\n"); }
-    | TOK_RIGHT_ARROW
-        { printf("[parser] atom operador: >\n"); }
-    | list_expr
+    | TOK_TRUE  { printf("[parser] atom: #t\n"); $$ = create_number(1); }
+    | TOK_FALSE { printf("[parser] atom: #f\n"); $$ = create_number(0); }
+    | list_expr { $$ = $1; }
     ;
-
-/* ─── Lista de expressões (zero ou mais) ─────────────────────────────────── */
 
 expr_list
     : /* vazio */
@@ -449,10 +480,6 @@ expr_list
     ;
 
 %%
-
-/* ════════════════════════════════════════════════════════════════════════════
-   FUNÇÕES AUXILIARES
-   ════════════════════════════════════════════════════════════════════════════ */
 
 void yyerror(const char *s) {
     fprintf(stderr, "[parser] ERRO sintatico (linha %d): %s | ultimo token: '%s'\n",
@@ -462,7 +489,7 @@ void yyerror(const char *s) {
 int main(void) {
     printf("=== Parser Scheme ===\n");
 
-    table = create_symbol_table(); /* parte integrada com symbol_table.h */
+    table = create_symbol_table();
 
     int result = yyparse();
     if (result == 0)
@@ -470,7 +497,7 @@ int main(void) {
     else
         printf("=== Parsing falhou ===\n");
 
-    free(table); /* parte integrada com symbol_table.h */
+    free(table);
 
     return result;
 }
