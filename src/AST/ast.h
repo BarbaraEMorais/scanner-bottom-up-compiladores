@@ -3,7 +3,7 @@
 
 typedef enum {
     NODE_NUMBER,
-    NODE_FLOAT,
+    NODE_DECIMAL,
     NODE_IDENTIFIER,
     NODE_BINARY_OP,
     NODE_DEFINE,
@@ -24,7 +24,7 @@ typedef struct ASTNode {
 
     union {
         int number;
-        double float_value;
+        double decimal;
         char *identifier;
         char *string_value;
         int boolean_value;
@@ -77,7 +77,7 @@ typedef struct ASTNode {
 void print_ast(ASTNode *node, int level);
 
 ASTNode *create_number(int value);
-ASTNode *create_float(double value);
+ASTNode *create_decimal(double value);
 ASTNode *create_identifier(char *name);
 ASTNode *create_boolean(int value);
 ASTNode *create_string(char *value);
