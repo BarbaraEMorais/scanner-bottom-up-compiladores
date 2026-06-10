@@ -1,77 +1,68 @@
 #include "AST/ast.h"
+#include <linux/limits.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 // Esse módulo navega pela AST e gera código python
 
-char* joinstr(char* base, char* to_add){
-    char ret[sizeof(base) + sizeof(to_add) + 1];
-
-    strcat(ret, base);
-    strcat(ret, base);
-}
-
-char* get_idents(int identation_level){
-    char* base = "";
+char* get_idents(char* base, int identation_level){
     for(int i = 0; i < identation_level; i++){
-        joinstr(base, "\t" );
+        base = strcat(base, "\t" );
     }
 
     return  base;
 }
 
-char* navigate_node(ASTNode* node, int identation_level){
+#define BUF_SIZE 9999
+
+char* navigate_node(ASTNode* node, int identation_level, FILE** fptr){
     int curr_ident = identation_level;
-    char* to_write = get_idents(curr_ident);
-    char* value = "";
+    char idents[BUF_SIZE];
+    get_idents(idents,  curr_ident);
     int temp_ident_store = 0;
     switch (node->type) {
         case NODE_NUMBER:
-            sscanf(value, "%d", &node->number);
-            joinstr(to_write, value );
+            fprintf(*fptr, "%s%d", idents, node->number);
             break;
         case NODE_IDENTIFIER:
-            sscanf(value, "%s", node->identifier);
-            joinstr(to_write, value );
+            fprintf(*fptr,  "%s%s",idents,  node->identifier);
             break;
         case  NODE_BINARY_OP:
-            joinstr(to_write, navigate_node(node->binary.left, 0));
-            joinstr(to_write, &node->binary.op);
-            joinstr(to_write, navigate_node(node->binary.right, 0));
+            navigate_node(node->binary.left, 0, fptr);
+            fprintf(*fptr, "%s", &node->binary.op);
+            navigate_node(node->binary.right, 0, fptr);
             break;
         case NODE_DEFINE:
-            joinstr(to_write, node->define_stmt.name);
-            joinstr(to_write, "=");
-            joinstr(to_write, navigate_node(node->define_stmt.value, 0));
-            joinstr(to_write, "\n");
+            fprintf(*fptr, "%s%s = ", idents, node->define_stmt.name);
+            navigate_node(node->define_stmt.value, 0, fptr);
+            fprintf(*fptr, "%s\n", idents);
             break;
         case NODE_IF:
-            joinstr(to_write, "if ");
-            joinstr(to_write, navigate_node(node->if_stmt.condition, 0));
-            joinstr(to_write, ":\n");
+            fprintf(*fptr, "%sif", idents);
+            navigate_node(node->if_stmt.condition, 0, fptr);
+            fprintf(*fptr, ":\n");
 
-            joinstr(to_write, navigate_node(node->if_stmt.then_branch, curr_ident+1));
+            navigate_node(node->if_stmt.then_branch, curr_ident+1, fptr);
 
-            joinstr(to_write, "else:\n");
-            joinstr(to_write, navigate_node(node->if_stmt.else_branch, curr_ident+1));
-            joinstr(to_write, "\n");
+            fprintf(*fptr, "%selse:\n", idents);
+            navigate_node(node->if_stmt.else_branch, curr_ident+1, fptr);
+            fprintf(*fptr, "\n");
             break;
         default:
             fprintf(stderr, "AST ERROR: node type %d is not a  defined type", node->type);
             return NULL;
     }
 
-
-    return to_write;
+    printf("%s", idents);
 }
 
-void generate(ASTNode* root){
-    FILE* fptr = fopen("out.py", "w");
+void generate(ASTNode* root, char* file_name){
+    FILE* fptr = fopen(file_name, "a");
 
-    fprintf(fptr,
-             "%s",
-            navigate_node(root, 0)
-        );
+    navigate_node(root, 0, &fptr);
+    
+    fclose(fptr);
     
 }
 
