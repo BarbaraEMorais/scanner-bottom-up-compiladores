@@ -67,7 +67,7 @@ typedef struct ASTNode {
         } begin_stmt;
 
         struct {
-            struct ASTNode *operator;  
+            struct ASTNode *op;  
             struct ASTNode *arguments; 
         } call_expr;
     };
@@ -83,7 +83,7 @@ ASTNode *create_boolean(int value);
 ASTNode *create_string(char *value);
 ASTNode *create_set(char *name, ASTNode *value);
 ASTNode *create_begin(ASTNode *exprs);
-ASTNode *create_call(ASTNode *operator, ASTNode *arguments);
+ASTNode *create_call(ASTNode *op, ASTNode *arguments);
 ASTNode *create_lambda(ASTNode *params, ASTNode *body);
 ASTNode *create_let(int is_rec, ASTNode *bindings, ASTNode *body);
 ASTNode *append_node(ASTNode *head, ASTNode *new_node);

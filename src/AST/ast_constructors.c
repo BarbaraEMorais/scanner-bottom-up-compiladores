@@ -152,7 +152,7 @@ ASTNode *create_begin(ASTNode *exprs) {
     return node;
 }
 
-ASTNode *create_call(ASTNode *operator, ASTNode *arguments) {
+ASTNode *create_call(ASTNode *op, ASTNode *arguments) {
 
     ASTNode *node = (ASTNode *)malloc(sizeof(ASTNode));
     if (!node) 
@@ -160,7 +160,7 @@ ASTNode *create_call(ASTNode *operator, ASTNode *arguments) {
 
     node->type = NODE_CALL;
     node->next = NULL;
-    node->call_expr.operator = operator;
+    node->call_expr.op = op;
     node->call_expr.arguments = arguments;
 
     return node;

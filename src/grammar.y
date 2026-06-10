@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "symbol_table.h"
-#include "errors.h"
 #include "AST/ast.h"
 
 #define YYDEBUG 1
@@ -13,8 +12,6 @@ extern int  yylineno;
 extern char *yytext;
 
 int num_errors = 0;
-
-Error* error_list = NULL;
 
 void yyerror(const char *s);
 
@@ -232,7 +229,7 @@ number
     | TOK_DECIMAL
         { 
             printf("[parser] numero decimal: %f\n", $1); 
-            $$ = create_decimal($1);
+            $$ = create_float($1);
         }
     ;
 
@@ -247,7 +244,7 @@ negative_number
         $$ = create_number(-$2);}
     | TOK_MINUS TOK_DECIMAL %prec TOK_UMINUS
         { printf("[parser] numero decimal negativo: -%f\n", $2); 
-        $$ = create_decimal(-$2);}
+        $$ = create_float(-$2);}
     ;
 
 /* ─── Átomos ─────────────────────────────────────────────────────────────── */
